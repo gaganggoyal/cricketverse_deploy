@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Light theme — warm cream/white surfaces, dark ink text, gold + pitch-green
+ * accents. Variable NAMES are kept from the original dark theme so every
+ * component re-themes automatically:
+ *   --dark   = page background (now light)
+ *   --dark2  = secondary surface
+ *   --card   = card surface
+ *   --cream  = primary text (now dark ink)
+ */
+:root {
+  --pitch:       #1e5c0e;
+  --pitch-light: #2d8a18;
+  --gold:        #1673c7;
+  --gold-light:  #4aa3e8;
+  --cream:       #16222c;
+  --dark:        #eaf3fb;
+  --dark2:       #dcebf7;
+  --card:        #ffffff;
+  --border:      rgba(22,115,199,0.22);
+  --border-hi:   rgba(22,115,199,0.55);
+  --muted:       rgba(22,34,44,0.55);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--dark);
+  color: var(--cream);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+/* Gold accent highlight */
+.gold { color: var(--gold); }
+
+/* Animate blink */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+.blink { animation: blink 1s infinite; }
+
+/* Over ball colours — solid chips that read on both light page and dark HUD */
+.bp-6  { background: #27ae60; color: #fff; }
+.bp-4  { background: #2473b5; color: #fff; }
+.bp-W  { background: #c0392b; color: #fff; }
+.bp-r  { background: rgba(29,36,31,0.12); color: var(--cream); border: 0.5px solid rgba(29,36,31,0.2); }
+.bp-e  { background: transparent; border: 1px dashed rgba(29,36,31,0.25); }
+
+/* The live-match HUD overlays sit on the 3D field, so pips there need the
+   dark-glass variant regardless of the page theme. */
+.hud-dark .bp-r { background: rgba(255,255,255,0.14); color: #e8e4da; border-color: rgba(255,255,255,0.2); }
+.hud-dark .bp-e { border-color: rgba(255,255,255,0.25); }

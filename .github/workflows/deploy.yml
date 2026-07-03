@@ -1,0 +1,185 @@
+name: CricketVerse CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION:   "20"
+
+jobs:
+
+  # ── SIM ENGINE TESTS ─────────────────────────────────────────
+  test-sim-engine:
+    name: Sim Engine Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sim-engine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-asyncio
+
+      - name: Run simulator tests
+        run: pytest tests/ -v --tb=short
+
+      - name: Smoke test — simulate full T20
+        run: python -c "
+from simulator import CricketSimulator, PlayerStats, PitchType, TimeOfPlay
+
+def bat(id, name, avg, sr, sty, ba=None, be=None, bt=None):
+    return PlayerStats(id=id,name=name,country='X',role='Batter' if not ba else 'Bowler',
+        bat_avg=avg,bat_sr=sr,bat_style=sty,bowl_avg=ba,bowl_economy=be,bowl_type=bt)
+
+team = [
+    bat('1','Batter1',55,140,'aggressive'), bat('2','Batter2',45,135,'balanced'),
+    bat('3','Batter3',40,130,'balanced'),   bat('4','Batter4',35,125,'defensive'),
+    bat('5','Batter5',30,120,'defensive'),  bat('6','Batter6',25,115,'defensive'),
+    bat('7','Batter7',20,110,'defensive'),  bat('8','Bowl1',12,95,'defensive',22,6.5,'Fast'),
+    bat('9','Bowl2',8,80,'defensive',25,6.8,'Fast'),
+    bat('10','Bowl3',6,72,'defensive',20,6.2,'Fast'),
+    bat('11','Bowl4',4,65,'defensive',27,7.0,'Spin'),
+]
+sim = CricketSimulator(team, team[:], 20, PitchType.FLAT, TimeOfPlay.EVENING)
+i1  = sim.simulate_innings('A')
+i2  = sim.simulate_innings('B', target=i1['total']+1)
+r   = sim.get_result()
+assert r['winner'] in ['A','B','tie'], 'Invalid result'
+assert 0 <= i1['wickets'] <= 10, 'Invalid wickets'
+assert i1['total'] >= 0, 'Negative score'
+print(f'PASS: {i1[\"total\"]}/{i1[\"wickets\"]} vs {i2[\"total\"]}/{i2[\"wickets\"]} — Team {r[\"winner\"]} wins by {r[\"margin\"]}')
+"
+
+  # ── FRONTEND LINT + TYPE CHECK ────────────────────────────────
+  test-frontend:
+    name: Frontend Type Check & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src --ext .ts,.tsx --max-warnings 20
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:      "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder"
+          NEXT_PUBLIC_SIM_URL:           "http://localhost:8000"
+
+  # ── DEPLOY SIM ENGINE → RAILWAY ──────────────────────────────
+  deploy-sim-engine:
+    name: Deploy Sim Engine → Railway
+    needs: [test-sim-engine, test-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy sim-engine service
+        run: railway up --service sim-engine --detach
+        working-directory: sim-engine
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy multiplayer service
+        run: railway up --service multiplayer --detach
+        working-directory: sim-engine/multiplayer
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ── DEPLOY FRONTEND → VERCEL ──────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend → Vercel
+    needs: [test-sim-engine, test-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel Production
+        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: frontend
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # ── POST-DEPLOY CHECKS ────────────────────────────────────────
+  post-deploy:
+    name: Post-Deploy Health Check
+    needs: [deploy-sim-engine, deploy-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Check frontend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://cricketverse.app)
+          echo "Frontend status: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+      - name: Check sim engine health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.SIM_ENGINE_URL }}/health)
+          echo "Sim engine status: $STATUS"
+          [ "$STATUS" = "200" ] || exit 1
+
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            { "text": "✅ CricketVerse deployed successfully to production!\nCommit: ${{ github.sha }}" }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            { "text": "🚨 CricketVerse deploy FAILED!\nCommit: ${{ github.sha }}\nCheck: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "name": "cricketverse",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "regions": ["bom1", "sin1", "lhr1"],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL":      "@supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "NEXT_PUBLIC_SIM_URL":           "@sim_url",
+    "NEXT_PUBLIC_MP_URL":            "@mp_url",
+    "NEXT_PUBLIC_APP_URL":           "@app_url",
+    "STRIPE_SECRET_KEY":             "@stripe_secret_key",
+    "STRIPE_WEBHOOK_SECRET":         "@stripe_webhook_secret",
+    "SUPABASE_SERVICE_KEY":          "@supabase_service_key"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options",           "value": "DENY" },
+        { "key": "X-Content-Type-Options",    "value": "nosniff" },
+        { "key": "Referrer-Policy",           "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy",        "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/sim/:path*", "destination": "@sim_url/:path*" }
+  ]
+}

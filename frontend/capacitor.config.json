@@ -1,0 +1,41 @@
+{
+  "appId": "com.cricketverse.app",
+  "appName": "CricketVerse",
+  "webDir": "out",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0a0f0d",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "iosSpinnerStyle": "small",
+      "spinnerColor": "#c9a84c"
+    },
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#0a0f0d"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  },
+  "ios": {
+    "scheme": "CricketVerse",
+    "backgroundColor": "#0a0f0d",
+    "preferredContentMode": "mobile",
+    "limitsNavigationsToAppBoundDomains": true,
+    "contentInset": "always"
+  },
+  "android": {
+    "backgroundColor": "#0a0f0d",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
