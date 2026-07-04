@@ -3,16 +3,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 
-const stripe     = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' })
-const webhookSec = process.env.STRIPE_WEBHOOK_SECRET!
-
-// Service-role Supabase client (bypasses RLS for webhook updates)
-const adminSupa  = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-)
-
 export async function POST(req: NextRequest) {
+  // Clients are built per-request, not at module scope: `next build`
+  // imports this file to collect route data, and constructing Stripe/
+  // Supabase-admin with missing env keys crashes the whole build.
+  const stripeKey  = process.env.STRIPE_SECRET_KEY
+  const webhookSec = process.env.STRIPE_WEBHOOK_SECRET
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY
+  if (!stripeKey || !webhookSec || !serviceKey) {
+    return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
+  }
+  const stripe = new Stripe(stripeKey, { apiVersion: '2024-04-10' })
+  // Service-role Supabase client (bypasses RLS for webhook updates)
+  const adminSupa = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
+
   const body      = await req.text()
   const signature = req.headers.get('stripe-signature')!
 
@@ -30,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   switch (event.type) {
     case 'checkout.session.completed': {
-      const session    = event.data.object as Stripe.CheckoutSession
+      const session    = event.data.object as Stripe.Checkout.Session
       const userId     = session.metadata?.user_id
       const subId      = session.subscription as string
       if (!userId) break

@@ -1,0 +1,47 @@
+# QuickCric — quickcric.online
+# Caddy obtains and renews Let's Encrypt certificates automatically; the
+# only requirement is that the domain's A record points at this server
+# before first start.
+#
+# Adding another site to this VPS later = one more block at the bottom:
+#   other-site.com {
+#       reverse_proxy other-frontend:3000
+#   }
+# (put the other project's containers on this compose network, or use
+#  host networking targets)
+
+{
+	# Used by Let's Encrypt for expiry warnings
+	email indiaoffers.in@gmail.com
+}
+
+www.quickcric.online {
+	redir https://quickcric.online{uri} permanent
+}
+
+quickcric.online {
+	encode gzip
+
+	# Sim engine — REST + live-match WebSocket.
+	# handle_path strips the /sim prefix, so the FastAPI app keeps its
+	# root-level routes (/match/start, /health, /match/<id>/live).
+	handle_path /sim/* {
+		reverse_proxy sim-engine:8000
+	}
+
+	# Multiplayer WebSocket service
+	handle_path /mp/* {
+		reverse_proxy multiplayer:8001
+	}
+
+	# Everything else — Next.js
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+}

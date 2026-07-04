@@ -26,7 +26,7 @@ export default function CoachPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    searchPlayers({limit:50}).then(setPlayers).catch(()=>{})
+    searchPlayers({limit:50}).then(p => setPlayers(p as unknown as Player[])).catch(()=>{})
   }, [])
 
   useEffect(() => {

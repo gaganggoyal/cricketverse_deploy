@@ -18,7 +18,7 @@ import { Player } from '@/types'
 import { searchPlayers } from '@/lib/supabase'
 
 // ── POINTS SYSTEM ─────────────────────────────────────────────────
-export const FANTASY_POINTS = {
+const FANTASY_POINTS = {
   // Batting
   run:           1,
   four_bonus:    4,
@@ -45,7 +45,9 @@ export const FANTASY_POINTS = {
   odi_multi:     0.8,
 }
 
-export function computeFantasyPoints(
+// Not `export`ed: Next.js page files may only export page/metadata fields,
+// and nothing else imports this helper.
+function computeFantasyPoints(
   player: { runs?: number; balls?: number; fours?: number; sixes?: number
             wickets?: number; overs?: number; maidens?: number; economy?: number
             catches?: number; stumpings?: number; runouts?: number },
@@ -107,7 +109,7 @@ export default function FantasyPage() {
   const [livePoints, setLivePoints] = useState<Record<string,number>>({})
 
   useEffect(() => {
-    searchPlayers({limit:80}).then(setAllPlayers).catch(()=>setAllPlayers([])).finally(()=>setLoading(false))
+    searchPlayers({limit:80}).then(p => setAllPlayers(p as unknown as Player[])).catch(()=>setAllPlayers([])).finally(()=>setLoading(false))
   }, [])
 
   const budget_used = team.players.reduce((s,p) => s + playerCost(p), 0)

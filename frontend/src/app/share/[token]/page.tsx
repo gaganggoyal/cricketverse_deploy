@@ -17,8 +17,9 @@ export default function SharePage() {
       .eq('share_token', token)
       .eq('is_public', true)
       .single()
-      .then(({ data }) => { setMatch(data); setLoading(false) })
-      .catch(() => setLoading(false))
+      // Supabase's query builder is a PromiseLike without .catch — pass
+      // the rejection handler as .then's second argument instead.
+      .then(({ data }) => { setMatch(data); setLoading(false) }, () => setLoading(false))
   }, [token])
 
   const copyLink = () => {

@@ -13,5 +13,8 @@ if [ ! -f .env ]; then
 fi
 
 echo "Starting with Docker Compose..."
-docker compose up --build
+# Detached on purpose: foreground compose tears down every container in the
+# project when the terminal closes or Ctrl-C is pressed.
+docker compose up -d --build
+echo "✅ Running — frontend on http://localhost:3000 (logs: docker compose logs -f)"
 

@@ -8,9 +8,9 @@ export function createClient(cookieStore: any) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string)                   { return cookieStore.get(name)?.value },
-        set(name, value, options)           { try { cookieStore.set({ name, value, ...options }) } catch {} },
-        remove(name, options)              { try { cookieStore.set({ name, value: '', ...options }) } catch {} },
+        get(name: string)                                { return cookieStore.get(name)?.value },
+        set(name: string, value: string, options: any)   { try { cookieStore.set({ name, value, ...options }) } catch {} },
+        remove(name: string, options: any)               { try { cookieStore.set({ name, value: '', ...options }) } catch {} },
       },
     }
   )
@@ -25,9 +25,9 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name)             { return request.cookies.get(name)?.value },
-        set(name, value, opt) { request.cookies.set({ name, value, ...opt }); response = NextResponse.next({ request: { headers: request.headers } }); response.cookies.set({ name, value, ...opt }) },
-        remove(name, opt)    { request.cookies.set({ name, value: '', ...opt }); response = NextResponse.next({ request: { headers: request.headers } }); response.cookies.set({ name, value: '', ...opt }) },
+        get(name: string)                            { return request.cookies.get(name)?.value },
+        set(name: string, value: string, opt: any)   { request.cookies.set({ name, value, ...opt }); response = NextResponse.next({ request: { headers: request.headers } }); response.cookies.set({ name, value, ...opt }) },
+        remove(name: string, opt: any)               { request.cookies.set({ name, value: '', ...opt }); response = NextResponse.next({ request: { headers: request.headers } }); response.cookies.set({ name, value: '', ...opt }) },
       },
     }
   )

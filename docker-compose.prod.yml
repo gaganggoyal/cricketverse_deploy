@@ -1,0 +1,82 @@
+# Production stack for the VPS (quickcric.online).
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences from the dev compose:
+#   - real builds (no source mounts, no --reload / npm run dev)
+#   - ONLY Caddy publishes ports (80/443) — sim engine, frontend and Redis
+#     are reachable exclusively on the internal network
+#   - Caddy terminates HTTPS with automatic Let's Encrypt certificates
+
+services:
+
+  sim-engine:
+    build:
+      context: ./sim-engine
+      dockerfile: Dockerfile
+    env_file: .env
+    command: uvicorn server:app --host 0.0.0.0 --port 8000 --ws websockets
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  multiplayer:
+    build:
+      context: ./sim-engine
+      dockerfile: Dockerfile
+    env_file: .env
+    command: uvicorn multiplayer.server:app --host 0.0.0.0 --port 8001 --ws websockets
+    restart: unless-stopped
+    depends_on:
+      - sim-engine
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL:      ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_SIM_URL:           ${NEXT_PUBLIC_SIM_URL}
+        NEXT_PUBLIC_MP_URL:            ${NEXT_PUBLIC_MP_URL}
+        NEXT_PUBLIC_APP_URL:           ${NEXT_PUBLIC_APP_URL}
+    # Server-side code (Stripe webhooks, admin sync, middleware) still reads
+    # secrets at runtime — build args above only cover the browser bundle.
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      - sim-engine
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployment/vps/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # certificates — must persist across restarts
+      - caddy_config:/config
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - sim-engine
+      - multiplayer
+
+volumes:
+  caddy_data:
+  caddy_config:

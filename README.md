@@ -119,17 +119,11 @@ cricketverse/
 │   └── 004_phase5.sql           ← Phase 5: Feature flags, analytics, referrals, materialized views
 │
 ├── deployment/
-│   ├── railway/railway.toml     ← Railway backend deploy config
-│   ├── vercel/vercel.json       ← Vercel frontend deploy config
-│   └── nginx/nginx.conf         ← Production reverse proxy + WebSocket
+│   └── vps/Caddyfile            ← Production reverse proxy + auto-HTTPS (quickcric.online)
 │
-├── marketing/
-│   └── landing.tsx              ← Full marketing landing page component
-│
-├── .github/
-│   └── workflows/deploy.yml     ← CI/CD: test → Railway → Vercel → health check
-│
-├── docker-compose.yml           ← Full stack: sim + multiplayer + frontend + redis + nginx
+├── docker-compose.yml           ← Dev stack: sim + multiplayer + frontend + redis
+├── docker-compose.prod.yml      ← Production stack for the VPS (adds Caddy)
+├── DEPLOY-VPS.md                ← Step-by-step production deployment guide
 ├── .env.example                 ← All required environment variables
 ├── start.sh                     ← One-command startup script
 └── README.md                    ← This file
@@ -262,19 +256,11 @@ python -m pytest tests/ -v
 
 ## Deploy to production
 
-**Backend → Railway:**
-```bash
-npm install -g @railway/cli
-railway login
-railway up --service sim-engine
-railway up --service multiplayer
-```
+The whole stack runs on a single VPS behind Caddy (automatic HTTPS) —
+see **[DEPLOY-VPS.md](DEPLOY-VPS.md)** for the full walkthrough:
 
-**Frontend → Vercel:**
 ```bash
-npm install -g vercel
-cd frontend
-vercel --prod
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 **Stripe webhooks (production):**

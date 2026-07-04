@@ -4,10 +4,14 @@ import Stripe from 'stripe'
 import { createClient } from '@/middleware'
 import { cookies } from 'next/headers'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-04-10' })
-
 export async function POST(req: NextRequest) {
   try {
+    // Per-request, not module scope: `next build` imports this file, and
+    // constructing Stripe without a key crashes the build.
+    const stripeKey = process.env.STRIPE_SECRET_KEY
+    if (!stripeKey) return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
+    const stripe = new Stripe(stripeKey, { apiVersion: '2024-04-10' })
+
     const supabase = createClient(cookies())
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

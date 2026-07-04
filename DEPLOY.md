@@ -1,4 +1,4 @@
-# 🚀 CricketVerse — Deployment Guide
+# 🚀 QuickCric — Deployment Guide
 
 ## Fastest path: watch a match in 10 seconds (zero setup)
 Open `frontend/public/match3d.html` directly in any browser.
@@ -6,49 +6,36 @@ The full 3D TV broadcast match works standalone — no server, no keys.
 
 ---
 
-## Option 1 — Full stack locally with Docker (5 min)
+## Local development (Docker)
 ```bash
 cp .env.example .env        # fill in Supabase + Anthropic keys
-docker compose up --build
+bash start.sh               # or: docker compose up -d --build
 # Frontend    → http://localhost:3000
 # 3D match    → http://localhost:3000/watch
 # Sim engine  → http://localhost:8000/health
 # Multiplayer → http://localhost:8001/rooms/open
 ```
+Source is volume-mounted with hot reload — no rebuild needed for code
+changes.
 
-## Option 2 — Deploy to production (free tiers)
+## Production (VPS · quickcric.online)
+See **[DEPLOY-VPS.md](DEPLOY-VPS.md)** — the full step-by-step for the
+Contabo VPS: DNS, firewall, `.env`, Caddy HTTPS, launch and redeploy.
 
-### A. Database — Supabase (free)
+## Database — Supabase
 1. Create project at supabase.com
 2. SQL Editor → run in order:
    `database/schema.sql` → `002_phase3.sql` → `003_phase4.sql` → `004_phase5.sql` → `005_match_history.sql`
-3. Copy Project URL + anon key + service key
+3. Copy Project URL + anon key + service key into `.env`
+4. Authentication → URL Configuration: set Site URL + redirect URL to
+   your domain (see DEPLOY-VPS.md §3)
 
-### B. Backend — Railway
-```bash
-npm i -g @railway/cli
-railway login
-railway init          # from repo root (railway.toml is already here)
-railway up
-# Set env vars in Railway dashboard: ANTHROPIC_API_KEY, CRICAPI_KEY,
-# NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_KEY
-```
-
-### C. Frontend — Vercel
-```bash
-npm i -g vercel
-cd frontend
-vercel --prod
-# Set env vars in Vercel dashboard (see .env.example for the full list)
-# Point NEXT_PUBLIC_SIM_URL / NEXT_PUBLIC_MP_URL at your Railway URLs
-```
-
-### D. Stripe webhooks (only if using billing)
+## Stripe webhooks (only if using billing)
 Stripe Dashboard → Webhooks → add endpoint:
-`https://yourdomain.com/api/stripe/webhook`
+`https://quickcric.online/api/stripe/webhook`
 Events: `checkout.session.completed`, `customer.subscription.deleted`, `invoice.payment_failed`
 
-### E. Daily player sync (optional, needs CricAPI key)
+## Daily player sync (optional, needs CricAPI key)
 ```bash
 cd sim-engine && CRICAPI_KEY=xxx python cricapi_sync.py
 ```
@@ -59,8 +46,3 @@ cd sim-engine && CRICAPI_KEY=xxx python cricapi_sync.py
 | NEXT_PUBLIC_SUPABASE_URL / ANON_KEY | auth, DB, everything |
 | ANTHROPIC_API_KEY | AI coach + commentary |
 | Everything else | optional (Stripe, CricAPI, ElevenLabs) |
-
-## CI/CD
-Push to `main` → `.github/workflows/deploy.yml` runs tests → deploys
-Railway + Vercel → health checks → Slack notify.
-Add secrets: `RAILWAY_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
