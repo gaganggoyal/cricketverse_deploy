@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { PWARegister } from '@/components/ui/PWARegister'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
@@ -19,8 +20,15 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   manifest: '/manifest.json',
   icons: { icon: '/icons/icon-32.png', apple: '/icons/icon-180.png' },
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'QuickCric' },
 }
-export const viewport: Viewport = { themeColor: '#0a0f0d', colorScheme: 'dark' }
+export const viewport: Viewport = {
+  themeColor: '#eaf3fb',
+  colorScheme: 'light',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
 
 const jsonLd = {
   '@context': 'https://schema.org', '@type': 'WebApplication',
@@ -35,7 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}><PWARegister />{children}</body>
     </html>
   )
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { v4 as uuidv4 } from 'uuid'
 import { useSetupStore } from '@/lib/store'
@@ -7,7 +7,12 @@ import { WizardHeader } from '@/components/setup/WizardShell'
 
 export default function TossPage() {
   const router = useRouter()
-  const { setup, setToss } = useSetupStore()
+  const { setup, setToss, clearToss } = useSetupStore()
+
+  // A toss left over from a previous match made `decided` true on arrival,
+  // showing FLIP COIN and LET'S PROCEED side by side. Every visit to this
+  // page starts with an unflipped coin.
+  useEffect(() => { clearToss() }, [clearToss])
 
   const opponentPreChoice = useMemo<'bat' | 'bowl'>(() => (Math.random() < 0.5 ? 'bat' : 'bowl'), [])
 

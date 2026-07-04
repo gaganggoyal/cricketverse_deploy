@@ -62,7 +62,7 @@ export function GlobalNav({ transparent = false }: NavProps) {
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           {/* Logo */}
           <button onClick={() => router.push('/')} className="font-bold tracking-widest text-[var(--gold)] text-lg flex-shrink-0" style={{ fontFamily: 'monospace' }}>
-            CRICKET<span className="text-[var(--cream)]">VERSE</span>
+            QUICK<span className="text-[var(--cream)]">CRIC</span>
           </button>
 
           {/* Links */}

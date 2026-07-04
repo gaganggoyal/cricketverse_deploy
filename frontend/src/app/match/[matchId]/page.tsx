@@ -37,6 +37,7 @@ export default function MatchPage() {
 
   const [autoMode,    setAutoMode]    = useState(true)
   const [actionText,  setActionText]  = useState('')
+  const [skipping,    setSkipping]    = useState(false)
 
   // Innings break is a full summary page the user reads and dismisses —
   // `proceed` carries whatever kicks off the 2nd innings for the active
@@ -413,7 +414,8 @@ export default function MatchPage() {
   // mid-animation the skip is deferred to its completion instead of being
   // dropped — this is why the button never needs to be disabled during play.
   const skipInnings = () => {
-    if (breakInfo) return
+    if (breakInfo || skipping) return
+    setSkipping(true)
     voice.stop()
     suppressAnnounceRef.current = true
     if (processingRef.current) {
@@ -424,8 +426,16 @@ export default function MatchPage() {
     if (queueRef.current.length && 'marker' in queueRef.current[0]) processNextBall()
   }
 
+  // The skip ends when its destination arrives: the break page (innings 1)
+  // or the result route (innings 2, which unmounts this page anyway).
+  useEffect(() => {
+    if (breakInfo && skipping) setSkipping(false)
+  }, [breakInfo, skipping])
+
+  // 100dvh, not h-screen: mobile browsers' collapsing URL bar makes 100vh
+  // taller than the visible area, which pushed the control bar off-screen.
   return (
-    <div className="relative h-screen overflow-hidden bg-[var(--dark)]">
+    <div className="relative h-[100dvh] overflow-hidden bg-[var(--dark)]">
 
       {/* 3D GROUND — full bleed */}
       <canvas
@@ -447,7 +457,7 @@ export default function MatchPage() {
         <button onClick={() => router.push('/')} className="text-sm text-[#16222c] bg-[rgba(255,255,255,0.9)] border border-[rgba(0,0,0,0.08)] px-3 py-1 rounded-full hover:bg-white transition-colors shadow-sm pointer-events-auto">
           ← QuickCric
         </button>
-        <div className="text-[10px] tracking-widest text-[#16222c] bg-[rgba(255,255,255,0.8)] px-3 py-1 rounded-full shadow-sm">
+        <div className="hidden sm:block text-[10px] tracking-widest text-[#16222c] bg-[rgba(255,255,255,0.8)] px-3 py-1 rounded-full shadow-sm">
           {setup.stadium?.name ?? 'Stadium'} · {setup.format} · {setup.pitch} pitch · {setup.time_of_play}
         </div>
       </div>
@@ -474,7 +484,7 @@ export default function MatchPage() {
       )}
 
       {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 h-[50px] px-3 flex items-center gap-2 bg-[rgba(255,255,255,0.95)] border-t border-[rgba(0,0,0,0.1)] z-30">
+      <div className="absolute bottom-0 left-0 right-0 h-[calc(50px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] px-3 flex items-center gap-2 bg-[rgba(255,255,255,0.95)] border-t border-[rgba(0,0,0,0.1)] z-30">
         {/* These stay ENABLED during a ball's animation/cooldown — the
             click handlers guard/defer internally. Disabling on transient
             `processing` made the buttons flicker off mid-play, which read
@@ -488,10 +498,12 @@ export default function MatchPage() {
         </button>
         <button
           onClick={skipInnings}
-          disabled={!queueLen}
+          disabled={!queueLen || skipping}
           className="flex-1 h-[34px] bg-[#1673c7] text-white rounded-md text-xs font-semibold disabled:opacity-40 hover:bg-[#2a8ada] transition-all"
         >
-          Skip innings
+          {skipping
+            ? <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> SKIPPING…</span>
+            : 'Skip innings'}
         </button>
         <button
           onClick={togglePause}

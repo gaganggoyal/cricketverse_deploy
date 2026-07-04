@@ -27,12 +27,24 @@
 
 * { box-sizing: border-box; }
 
+html {
+  /* iOS Safari inflates text on rotate without this */
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--dark);
   color: var(--cream);
   font-family: 'Inter', system-ui, sans-serif;
   min-height: 100vh;
+  /* Decorative absolutely-positioned arcs bleed past the viewport edge on
+     phones — never let them create a sideways scroll. */
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
+
+/* Bottom padding matching the iPhone home-indicator inset */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }

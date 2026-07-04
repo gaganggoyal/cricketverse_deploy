@@ -42,7 +42,12 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(p + '/'))
 
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    // Carry the destination along so sign-in drops the user back where
+    // they were headed (e.g. straight into the match they just built),
+    // not on the dashboard.
+    const login = new URL('/auth/login', request.url)
+    login.searchParams.set('redirect', request.nextUrl.pathname)
+    return NextResponse.redirect(login)
   }
 
   return response

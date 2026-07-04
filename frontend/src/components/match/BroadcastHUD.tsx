@@ -85,9 +85,10 @@ export function BroadcastHUD({
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
 
-      {/* ── DELIVERY INFO (top-right) ──────────────────────────── */}
+      {/* ── DELIVERY INFO (top-right) — desktop only; on phones it
+          collides with the top-left pills and eats field view. ──── */}
       {current.last_ball && (
-        <div className={`absolute top-3 right-3 min-w-[170px] rounded-lg overflow-hidden ${GLASS}`}>
+        <div className={`hidden md:block absolute top-3 right-3 min-w-[170px] rounded-lg overflow-hidden ${GLASS}`}>
           <div className="text-white text-[9px] font-bold tracking-widest px-3 py-1 uppercase" style={{ background: BLUE }}>Delivery</div>
           <div className="px-3 py-2 space-y-1.5">
             <div className="flex justify-between text-xs gap-4"><span className={INK_MUTED}>Bowler</span><span className={`font-semibold ${INK}`}>{current.bowler?.player.name ?? '—'}</span></div>
@@ -98,129 +99,138 @@ export function BroadcastHUD({
         </div>
       )}
 
-      {/* ── CREASE STRIP (horizontal, above the band — TV-style) ──
-          Striker is unmistakable: filled blue card with the * every
-          scorecard uses; non-striker stays neutral glass; the bowler
-          gets the opposition red. */}
-      <div className="absolute left-3 bottom-[152px] flex flex-row items-stretch gap-1.5">
-        {current.batter1 && (
-          <div className="rounded-md px-3 py-1.5 min-w-[172px] text-white shadow-[0_2px_12px_rgba(0,40,80,0.25)]" style={{ background: BLUE }}>
-            <div className="text-[7px] font-bold tracking-[2px] opacity-80 mb-0.5">BATTING · ON STRIKE</div>
-            <div className="text-sm font-bold leading-none">
-              {current.batter1.player.name} <span className="font-black">*</span>
-            </div>
-            <div className="text-[10px] font-mono opacity-90">{current.batter1.runs} ({current.batter1.balls}) · SR {current.batter1.balls > 0 ? ((current.batter1.runs / current.batter1.balls) * 100).toFixed(0) : '—'}</div>
-          </div>
-        )}
-        {current.batter2 && (
-          <div className={`rounded-md px-3 py-1.5 min-w-[150px] ${GLASS}`}>
-            <div className={`text-[7px] font-bold tracking-[2px] mb-0.5 ${INK_MUTED}`}>NON-STRIKER</div>
-            <div className={`text-sm font-semibold leading-none ${INK}`}>{current.batter2.player.name}</div>
-            <div className={`text-[10px] font-mono ${INK_MUTED}`}>{current.batter2.runs} ({current.batter2.balls})</div>
-          </div>
-        )}
-        {current.bowler && (
-          <div className="rounded-md px-3 py-1.5 min-w-[172px] text-white shadow-[0_2px_12px_rgba(80,10,0,0.25)] bg-[#c0392b]">
-            <div className="text-[7px] font-bold tracking-[2px] opacity-80 mb-0.5">BOWLING</div>
-            <div className="text-sm font-bold leading-none">{current.bowler.player.name}</div>
-            <div className="text-[10px] font-mono opacity-90">{current.bowler.wickets}-{current.bowler.runs} ({current.bowler.overs}) · Econ {current.bowler.economy.toFixed(1)}</div>
-          </div>
-        )}
-      </div>
+      {/* ── BOTTOM STACK (crease strip · commentary · band) ───────
+          One bottom-anchored column instead of magic pixel offsets, so
+          the layout holds together at any width. On desktop the crease
+          strip sits left and the commentary right (TV-style); on phones
+          they stack full-width. */}
+      <div className="absolute bottom-[calc(50px+env(safe-area-inset-bottom))] left-0 right-0 flex flex-col">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-1.5 px-3 pb-1.5">
 
-      {/* ── COMMENTARY BOX (right, above the band) ─────────────── */}
-      <div className={`absolute right-3 bottom-[152px] w-[370px] rounded-lg overflow-hidden pointer-events-auto ${GLASS}`}>
-        <div className="flex items-center justify-between px-3 py-1.5" style={{ background: BLUE }}>
-          <div className="text-[9px] font-bold tracking-widest text-white uppercase">
-            Commentary · {PERSONAS[lang].name}
-          </div>
-          <div className="flex gap-1.5 items-center">
-            {(['en', 'hi'] as const).map(l => (
-              <button key={l} onClick={() => onLangChange(l)}
-                className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-all ${lang === l ? 'bg-white' : 'bg-[rgba(255,255,255,0.2)] text-white'}`}
-                style={lang === l ? { color: BLUE } : undefined}>
-                {l === 'en' ? 'ENGLISH' : 'हिंदी'}
-              </button>
-            ))}
-            <button onClick={onToggleAudio}
-              className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-all ${audioEnabled ? 'bg-white' : 'bg-[rgba(255,255,255,0.2)] text-white opacity-70'}`}
-              style={audioEnabled ? { color: BLUE } : undefined}>
-              AUDIO {audioEnabled ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        </div>
-        <div className="px-3 py-2 space-y-1.5 min-h-[64px]">
-          {recentBalls.length === 0 && <div className={`text-xs ${INK_MUTED}`}>Play is underway…</div>}
-          {recentBalls.map((ev, i) => (
-            <div key={`${ev.label}-${i}`} className={`flex items-start gap-2 ${i > 0 ? 'opacity-55' : ''}`}>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${pipClass(ev.outcome)}`}>
-                {ev.outcome === 'W' ? 'W' : ev.runs}
+          {/* Crease strip — striker filled blue with the *, non-striker
+              neutral glass (desktop only), bowler in opposition red. */}
+          <div className="flex flex-row items-stretch gap-1.5 overflow-x-auto">
+            {current.batter1 && (
+              <div className="rounded-md px-3 py-1.5 flex-1 md:flex-none min-w-0 md:min-w-[172px] text-white shadow-[0_2px_12px_rgba(0,40,80,0.25)]" style={{ background: BLUE }}>
+                <div className="text-[7px] font-bold tracking-[2px] opacity-80 mb-0.5">BATTING · ON STRIKE</div>
+                <div className="text-sm font-bold leading-none truncate">
+                  {current.batter1.player.name} <span className="font-black">*</span>
+                </div>
+                <div className="text-[10px] font-mono opacity-90">{current.batter1.runs} ({current.batter1.balls}) · SR {current.batter1.balls > 0 ? ((current.batter1.runs / current.batter1.balls) * 100).toFixed(0) : '—'}</div>
               </div>
-              <div className="min-w-0">
-                <span className={`text-[10px] font-mono mr-1.5 ${INK_MUTED}`}>{ev.label}</span>
-                <span className={`text-xs leading-snug ${INK}`}>{lineFor(ev)}</span>
+            )}
+            {current.batter2 && (
+              <div className={`hidden md:block rounded-md px-3 py-1.5 min-w-[150px] ${GLASS}`}>
+                <div className={`text-[7px] font-bold tracking-[2px] mb-0.5 ${INK_MUTED}`}>NON-STRIKER</div>
+                <div className={`text-sm font-semibold leading-none ${INK}`}>{current.batter2.player.name}</div>
+                <div className={`text-[10px] font-mono ${INK_MUTED}`}>{current.batter2.runs} ({current.batter2.balls})</div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── BOTTOM BROADCAST BAND (above controls) ─────────────── */}
-      <div className="absolute bottom-[50px] left-0 right-0 bg-[rgba(255,255,255,0.96)] border-t border-[rgba(0,0,0,0.1)] shadow-[0_-2px_10px_rgba(0,40,80,0.12)]">
-        {/* Row 1 — scorebug · this over · stats */}
-        <div className="flex items-stretch h-[58px]">
-          <div className="px-4 flex flex-col justify-center min-w-[150px] border-l-4" style={{ borderLeftColor: BLUE }}>
-            <div className={`text-[10px] tracking-wide ${INK_MUTED}`}>{battingName}</div>
-            <div className={`font-mono text-2xl font-black leading-none ${INK}`}>{current.score}/{current.wickets}</div>
-            <div className={`text-[9px] font-mono ${INK_MUTED}`}>{current.overs} / {totalOvers} ov</div>
-          </div>
-          <div className="px-3 flex flex-col items-center justify-center min-w-[54px] text-white" style={{ background: BLUE }}>
-            {status === 'live' && <span className="w-2 h-2 rounded-full bg-red-400 blink" />}
-            <div className="text-[9px] font-black tracking-widest mt-0.5">LIVE</div>
-            <div className="text-[7px] font-bold opacity-80">{setup.format}</div>
-          </div>
-          <div className="px-4 flex flex-col justify-center min-w-[150px]">
-            <div className={`text-[10px] tracking-wide ${INK_MUTED}`}>{bowlingName}</div>
-            {current.target ? (
-              <>
-                <div className={`font-mono text-sm font-bold ${INK}`}>Target {current.target}</div>
-                <div className="text-[9px] font-semibold" style={{ color: BLUE }}>Need {current.target - current.score} off {totalOvers * 6 - current.balls} balls</div>
-              </>
-            ) : (
-              <div className={`text-[10px] ${INK_MUTED}`}>Yet to bat</div>
+            )}
+            {current.bowler && (
+              <div className="rounded-md px-3 py-1.5 flex-1 md:flex-none min-w-0 md:min-w-[172px] text-white shadow-[0_2px_12px_rgba(80,10,0,0.25)] bg-[#c0392b]">
+                <div className="text-[7px] font-bold tracking-[2px] opacity-80 mb-0.5">BOWLING</div>
+                <div className="text-sm font-bold leading-none truncate">{current.bowler.player.name}</div>
+                <div className="text-[10px] font-mono opacity-90">{current.bowler.wickets}-{current.bowler.runs} ({current.bowler.overs}) · Econ {current.bowler.economy.toFixed(1)}</div>
+              </div>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 px-4 border-l border-[rgba(0,0,0,0.08)]">
-            <span className={`text-[8px] tracking-widest mr-1 ${INK_MUTED}`}>THIS OVER</span>
-            {current.over_balls.map((b, i) => (
-              <div key={i} className={`w-[20px] h-[20px] rounded-full flex items-center justify-center text-[9px] font-bold ${pipClass(b)}`}>
-                {b === 'W' ? 'W' : b}
+          {/* Commentary box — full width on phones (latest ball only),
+              fixed 370px on desktop (last three balls). */}
+          <div className={`w-full md:w-[370px] shrink-0 rounded-lg overflow-hidden pointer-events-auto ${GLASS}`}>
+            <div className="flex items-center justify-between px-3 py-1.5" style={{ background: BLUE }}>
+              <div className="text-[9px] font-bold tracking-widest text-white uppercase truncate">
+                Commentary · {PERSONAS[lang].name}
               </div>
-            ))}
-            {Array.from({ length: Math.max(0, 6 - current.over_balls.length) }).map((_, i) => (
-              <div key={i} className="w-[20px] h-[20px] rounded-full bp-e" />
-            ))}
-          </div>
-
-          <div className="flex items-center ml-auto">
-            {[['RUN RATE', rr], ['REQUIRED', rrr ?? '—'], ['PARTNERSHIP', String(current.partnership)], ['WKTS LEFT', String(10 - current.wickets)]].map(([l, v]) => (
-              <div key={l} className="px-4 py-1.5 border-l border-[rgba(0,0,0,0.08)] text-center">
-                <div className={`font-mono text-sm font-bold ${INK}`}>{v}</div>
-                <div className={`text-[7px] tracking-widest uppercase ${INK_MUTED}`}>{l}</div>
+              <div className="flex gap-1.5 items-center shrink-0">
+                {(['en', 'hi'] as const).map(l => (
+                  <button key={l} onClick={() => onLangChange(l)}
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-all ${lang === l ? 'bg-white' : 'bg-[rgba(255,255,255,0.2)] text-white'}`}
+                    style={lang === l ? { color: BLUE } : undefined}>
+                    {l === 'en' ? 'ENGLISH' : 'हिंदी'}
+                  </button>
+                ))}
+                <button onClick={onToggleAudio}
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full transition-all ${audioEnabled ? 'bg-white' : 'bg-[rgba(255,255,255,0.2)] text-white opacity-70'}`}
+                  style={audioEnabled ? { color: BLUE } : undefined}>
+                  AUDIO {audioEnabled ? 'ON' : 'OFF'}
+                </button>
               </div>
-            ))}
+            </div>
+            <div className="px-3 py-2 space-y-1.5 min-h-[40px] md:min-h-[64px]">
+              {recentBalls.length === 0 && <div className={`text-xs ${INK_MUTED}`}>Play is underway…</div>}
+              {recentBalls.map((ev, i) => (
+                <div key={`${ev.label}-${i}`} className={`items-start gap-2 ${i > 0 ? 'hidden md:flex opacity-55' : 'flex'}`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${pipClass(ev.outcome)}`}>
+                    {ev.outcome === 'W' ? 'W' : ev.runs}
+                  </div>
+                  <div className="min-w-0">
+                    <span className={`text-[10px] font-mono mr-1.5 ${INK_MUTED}`}>{ev.label}</span>
+                    <span className={`text-xs leading-snug ${INK}`}>{lineFor(ev)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Row 2 — WIN PROBABILITY, clearly labelled */}
-        <div className="flex items-center gap-3 px-4 py-1.5 border-t border-[rgba(0,0,0,0.07)]">
-          <span className={`text-[9px] font-black tracking-widest ${INK_MUTED}`}>WIN PROBABILITY</span>
-          <span className="text-[11px] font-bold min-w-[110px] text-right truncate" style={{ color: BLUE }}>{teamAName} {teamAWP}%</span>
-          <div className="flex-1 h-[8px] rounded-full overflow-hidden bg-[rgba(0,0,0,0.1)]">
-            <div className="h-full transition-all duration-700" style={{ width: `${teamAWP}%`, background: BLUE }} />
+        {/* ── BROADCAST BAND ─────────────────────────────────────── */}
+        <div className="bg-[rgba(255,255,255,0.96)] border-t border-[rgba(0,0,0,0.1)] shadow-[0_-2px_10px_rgba(0,40,80,0.12)]">
+          {/* Row 1 — scorebug · this over · stats (stats desktop-only) */}
+          <div className="flex flex-wrap md:flex-nowrap items-stretch md:h-[58px]">
+            <div className="px-3 md:px-4 py-1.5 md:py-0 flex flex-col justify-center min-w-[110px] md:min-w-[150px] border-l-4" style={{ borderLeftColor: BLUE }}>
+              <div className={`text-[10px] tracking-wide truncate ${INK_MUTED}`}>{battingName}</div>
+              <div className={`font-mono text-xl md:text-2xl font-black leading-none ${INK}`}>{current.score}/{current.wickets}</div>
+              <div className={`text-[9px] font-mono ${INK_MUTED}`}>{current.overs} / {totalOvers} ov</div>
+            </div>
+            <div className="px-2.5 md:px-3 flex flex-col items-center justify-center min-w-[48px] md:min-w-[54px] text-white" style={{ background: BLUE }}>
+              {status === 'live' && <span className="w-2 h-2 rounded-full bg-red-400 blink" />}
+              <div className="text-[9px] font-black tracking-widest mt-0.5">LIVE</div>
+              <div className="text-[7px] font-bold opacity-80">{setup.format}</div>
+            </div>
+            <div className="px-3 md:px-4 py-1.5 md:py-0 flex flex-col justify-center min-w-[110px] md:min-w-[150px]">
+              <div className={`text-[10px] tracking-wide truncate ${INK_MUTED}`}>{bowlingName}</div>
+              {current.target ? (
+                <>
+                  <div className={`font-mono text-sm font-bold ${INK}`}>Target {current.target}</div>
+                  <div className="text-[9px] font-semibold" style={{ color: BLUE }}>Need {current.target - current.score} off {totalOvers * 6 - current.balls} balls</div>
+                </>
+              ) : (
+                <div className={`text-[10px] ${INK_MUTED}`}>Yet to bat</div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-0 md:border-l border-[rgba(0,0,0,0.08)]">
+              <span className={`text-[8px] tracking-widest mr-1 ${INK_MUTED}`}>THIS OVER</span>
+              {current.over_balls.map((b, i) => (
+                <div key={i} className={`w-[20px] h-[20px] rounded-full flex items-center justify-center text-[9px] font-bold ${pipClass(b)}`}>
+                  {b === 'W' ? 'W' : b}
+                </div>
+              ))}
+              {Array.from({ length: Math.max(0, 6 - current.over_balls.length) }).map((_, i) => (
+                <div key={i} className="w-[20px] h-[20px] rounded-full bp-e" />
+              ))}
+            </div>
+
+            <div className="hidden lg:flex items-center ml-auto">
+              {[['RUN RATE', rr], ['REQUIRED', rrr ?? '—'], ['PARTNERSHIP', String(current.partnership)], ['WKTS LEFT', String(10 - current.wickets)]].map(([l, v]) => (
+                <div key={l} className="px-4 py-1.5 border-l border-[rgba(0,0,0,0.08)] text-center">
+                  <div className={`font-mono text-sm font-bold ${INK}`}>{v}</div>
+                  <div className={`text-[7px] tracking-widest uppercase ${INK_MUTED}`}>{l}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          <span className={`text-[11px] font-bold min-w-[110px] truncate ${INK_MUTED}`}>{100 - teamAWP}% {teamBName}</span>
+
+          {/* Row 2 — WIN PROBABILITY, clearly labelled */}
+          <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 border-t border-[rgba(0,0,0,0.07)]">
+            <span className={`hidden sm:inline text-[9px] font-black tracking-widest ${INK_MUTED}`}>WIN PROBABILITY</span>
+            <span className="text-[11px] font-bold min-w-0 md:min-w-[110px] text-right truncate" style={{ color: BLUE }}>{teamAName} {teamAWP}%</span>
+            <div className="flex-1 h-[8px] rounded-full overflow-hidden bg-[rgba(0,0,0,0.1)]">
+              <div className="h-full transition-all duration-700" style={{ width: `${teamAWP}%`, background: BLUE }} />
+            </div>
+            <span className={`text-[11px] font-bold min-w-0 md:min-w-[110px] truncate ${INK_MUTED}`}>{100 - teamAWP}% {teamBName}</span>
+          </div>
         </div>
       </div>
 

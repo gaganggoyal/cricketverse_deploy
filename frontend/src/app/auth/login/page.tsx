@@ -15,19 +15,27 @@ export default function LoginPage() {
   const [resent, setResent]     = useState(false)
   const [resending, setResending] = useState(false)
 
+  // Where to land after auth — the middleware sets ?redirect= when it
+  // bounces someone off a protected page (e.g. the match they just built).
+  // window.location instead of useSearchParams: no Suspense boundary needed.
+  const postAuthPath = () => {
+    const r = new URLSearchParams(window.location.search).get('redirect')
+    return r && r.startsWith('/') ? r : '/dashboard'
+  }
+
   const handleEmail = async () => {
     setLoading(true); setError(''); setNeedsConfirm(false); setResent(false)
     try {
       if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password,
-          options: { emailRedirectTo: `${location.origin}/auth/callback` }
+          options: { emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(postAuthPath())}` }
         })
         if (error) throw error
         setSent(true)
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        router.push('/dashboard')
+        router.push(postAuthPath())
       }
     } catch (e: any) {
       setError(e.message)
@@ -56,7 +64,7 @@ export default function LoginPage() {
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${location.origin}/auth/callback` }
+      options: { redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(postAuthPath())}` }
     })
   }
 
@@ -76,7 +84,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-3xl font-bold tracking-widest text-[var(--gold)] mb-1" style={{fontFamily:'monospace'}}>
-            CRICKET<span className="text-[var(--cream)]">VERSE</span>
+            QUICK<span className="text-[var(--cream)]">CRIC</span>
           </div>
           <div className="text-sm text-[var(--muted)]">
             {mode === 'login' ? 'Welcome back' : 'Create your account'}

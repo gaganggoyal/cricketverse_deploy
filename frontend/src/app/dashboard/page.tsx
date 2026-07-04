@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, getUserMatches } from '@/lib/supabase'
+import { useSetupStore } from '@/lib/store'
 
 interface Match {
   id: string
@@ -24,12 +25,6 @@ interface UserProfile {
   plan: string
   matches_played: number
   matches_this_month: number
-}
-
-const PLAN_LIMITS: Record<string, number> = {
-  free:  5,
-  pro:   999,
-  elite: 999,
 }
 
 export default function DashboardPage() {
@@ -67,10 +62,6 @@ export default function DashboardPage() {
     router.push('/')
   }
 
-  const matchesLeft = profile
-    ? PLAN_LIMITS[profile.plan] - (profile.matches_this_month ?? 0)
-    : 0
-
   if (loading) return (
     <div className="min-h-screen bg-[var(--dark)] flex items-center justify-center">
       <div className="text-[var(--muted)] text-sm">Loading dashboard...</div>
@@ -93,46 +84,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Plan card */}
-      <div className={`rounded-xl p-4 mb-4 border ${
-        profile?.plan === 'pro'
-          ? 'border-[var(--gold)] bg-[rgba(22,115,199,0.08)]'
-          : 'border-[var(--border)] bg-[var(--card)]'
-      }`}>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="text-[9px] uppercase tracking-widest text-[var(--muted)] mb-0.5">Current plan</div>
-            <div className="text-base font-medium text-[var(--cream)] capitalize">{profile?.plan ?? 'Free'}</div>
-          </div>
-          {profile?.plan === 'free' && (
-            <button
-              onClick={() => router.push('/billing')}
-              className="text-xs px-3 py-1.5 bg-[var(--gold)] text-[var(--dark)] rounded-lg font-medium hover:bg-[var(--gold-light)] transition-all"
-            >
-              Upgrade → Pro
-            </button>
-          )}
-        </div>
-        {/* Usage bar */}
-        <div className="text-xs text-[var(--muted)] mb-1.5">
-          {profile?.matches_this_month ?? 0} / {PLAN_LIMITS[profile?.plan ?? 'free'] === 999 ? '∞' : PLAN_LIMITS[profile?.plan ?? 'free']} matches this month
-        </div>
-        <div className="h-1.5 bg-[var(--border)] rounded overflow-hidden">
-          <div
-            className="h-full rounded transition-all"
-            style={{
-              width: `${Math.min(100, ((profile?.matches_this_month ?? 0) / Math.max(1, PLAN_LIMITS[profile?.plan ?? 'free'])) * 100)}%`,
-              background: profile?.plan === 'free' && matchesLeft <= 1 ? '#e74c3c' : 'var(--gold)',
-            }}
-          />
-        </div>
-        {profile?.plan === 'free' && matchesLeft <= 1 && (
-          <div className="text-xs text-red-400 mt-1.5">
-            {matchesLeft === 0 ? 'Monthly limit reached — upgrade for unlimited matches' : '1 match remaining this month'}
-          </div>
-        )}
-      </div>
-
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         {[
@@ -149,9 +100,8 @@ export default function DashboardPage() {
 
       {/* New match CTA */}
       <button
-        onClick={() => router.push('/setup')}
-        disabled={profile?.plan === 'free' && matchesLeft <= 0}
-        className="w-full py-3.5 bg-[var(--gold)] text-[var(--dark)] rounded-xl font-bold tracking-widest text-sm disabled:opacity-40 hover:bg-[var(--gold-light)] transition-all mb-5"
+        onClick={() => { useSetupStore.getState().reset(); router.push('/setup') }}
+        className="w-full py-3.5 bg-[var(--gold)] text-[var(--dark)] rounded-xl font-bold tracking-widest text-sm hover:bg-[var(--gold-light)] transition-all mb-5"
         style={{fontFamily:'monospace'}}
       >
         + BUILD NEW MATCH

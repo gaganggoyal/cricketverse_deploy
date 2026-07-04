@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useLiveMatch, useSetupStore } from '@/lib/store'
 import { InningsScorecard } from '@/components/match/InningsScorecard'
@@ -13,7 +13,7 @@ export default function ResultPage() {
   const { matchId }  = useParams() as { matchId: string }
   const router       = useRouter()
   const { result, innings1, innings2, matchId: liveMatchId } = useLiveMatch()
-  const { setup } = useSetupStore()
+  const { setup, resetForNewMatch } = useSetupStore()
   const [navigating, setNavigating] = useState<'new' | 'history' | null>(null)
 
   // The in-memory result only belongs to THIS page if the ids match —
@@ -68,8 +68,13 @@ export default function ResultPage() {
 
   // Snapshot this match into history (Supabase for signed-in users,
   // localStorage fallback) so it shows up under "Your previous matches".
+  // Save exactly once: "Build a new match" resets the setup store while
+  // this page is still mounted, which used to re-fire this effect with the
+  // fallback team names and overwrite the saved match as "Team A/Team B".
+  const savedOnceRef = useRef(false)
   useEffect(() => {
-    if (!isLive || !result || !liveCards) return
+    if (!isLive || !result || !liveCards || savedOnceRef.current) return
+    savedOnceRef.current = true
     saveMatch({
       id: matchId,
       playedAt: new Date().toISOString(),
@@ -151,7 +156,11 @@ export default function ResultPage() {
           {navigating === 'history' ? <Spinner /> : 'Previous matches'}
         </button>
         <button
-          onClick={() => { setNavigating('new'); router.push('/setup') }}
+          // Keep the ground conditions, wipe teams/captains/orders/toss and
+          // go straight to team selection — re-picking the stadium every
+          // time was friction, but stale teams leaking into the next match
+          // (and pre-decided tosses) were bugs.
+          onClick={() => { setNavigating('new'); resetForNewMatch(); router.push(setup.format ? '/setup/teams' : '/setup') }}
           disabled={!!navigating}
           className="flex-1 py-3 bg-[var(--gold)] text-white rounded-xl text-sm font-semibold hover:bg-[var(--gold-light)] transition-all disabled:opacity-60"
         >

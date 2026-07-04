@@ -32,18 +32,18 @@ export default function Home() {
       <div className="absolute -bottom-48 -left-48 w-[560px] h-[560px] rounded-full border-[3px] border-[rgba(45,138,24,0.12)] pointer-events-none" />
       <div className="absolute -bottom-28 -left-28 w-[340px] h-[340px] rounded-full border-[3px] border-[rgba(45,138,24,0.18)] pointer-events-none" />
 
-      <div className="relative max-w-4xl mx-auto px-6 pt-20 pb-16 flex flex-col items-center text-center">
+      <div className="relative max-w-4xl mx-auto px-5 sm:px-6 pt-14 sm:pt-20 pb-16 flex flex-col items-center text-center">
 
         {/* Wordmark */}
         <div className="text-[10px] tracking-[4px] text-[var(--gold)] mb-5 flex items-center gap-3 font-semibold">
-          <span className="w-10 h-px bg-[var(--gold)]" /> REAL PLAYERS · AI POWERED · LIVE 3D <span className="w-10 h-px bg-[var(--gold)]" />
+          <span className="w-6 sm:w-10 h-px bg-[var(--gold)]" /> REAL PLAYERS · AI POWERED · LIVE 3D <span className="w-6 sm:w-10 h-px bg-[var(--gold)]" />
         </div>
-        <h1 className="text-7xl font-black mb-1 leading-none tracking-tight">
+        <h1 className="text-5xl sm:text-7xl font-black mb-1 leading-none tracking-tight">
           <span className="text-[var(--gold)]">Quick</span><span className="text-[var(--cream)]">Cric</span>
         </h1>
         <div className="text-sm tracking-[3px] text-[var(--muted)] mb-8 font-medium">ANY MATCH. ANY TIME. YOURS.</div>
 
-        <p className="text-xl text-[var(--cream)] max-w-xl mb-3 leading-relaxed font-medium">
+        <p className="text-lg sm:text-xl text-[var(--cream)] max-w-xl mb-3 leading-relaxed font-medium">
           Why wait for the next real fixture? Build the match you want to see
           and watch it live in 3D — in minutes.
         </p>
@@ -55,7 +55,7 @@ export default function Home() {
         <button
           onClick={() => { setNavigating('build'); router.push('/setup') }}
           disabled={!!navigating}
-          className="px-12 py-4 bg-[var(--gold)] text-white rounded-xl font-bold tracking-widest text-lg hover:bg-[var(--gold-light)] hover:scale-[1.02] transition-all shadow-[0_8px_24px_rgba(22,115,199,0.35)] disabled:opacity-70 disabled:hover:scale-100"
+          className="w-full sm:w-auto px-8 sm:px-12 py-4 bg-[var(--gold)] text-white rounded-xl font-bold tracking-widest text-base sm:text-lg hover:bg-[var(--gold-light)] hover:scale-[1.02] transition-all shadow-[0_8px_24px_rgba(22,115,199,0.35)] disabled:opacity-70 disabled:hover:scale-100"
         >
           {navigating === 'build'
             ? <span className="inline-flex items-center gap-3"><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> SETTING UP...</span>
@@ -101,7 +101,7 @@ export default function Home() {
         </div>
 
         {/* Stats */}
-        <div className="mt-12 flex gap-10 text-center">
+        <div className="mt-12 flex flex-wrap justify-center gap-x-10 gap-y-6 text-center">
           {[
             { n: '200+', l: 'Real players' },
             { n: '15', l: 'IPL & WPL squads' },

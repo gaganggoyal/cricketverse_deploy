@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { MatchSetup, InningsState, MatchResult, BallEvent, BatterLive, BowlerLive, Player, Stadium, Outcome, BowlerAllocation } from '@/types'
 
 // ─────────────────────────────────────────────
@@ -23,10 +24,16 @@ interface SetupStore {
   setBowlingOrderA: (players: Player[]) => void
   setBowlingOrderB: (players: Player[]) => void
   setToss: (winner: 'A' | 'B', decision: 'bat' | 'bowl') => void
+  clearToss: () => void
+  resetForNewMatch: () => void
   reset: () => void
 }
 
-export const useSetupStore = create<SetupStore>((set) => ({
+// Persisted to sessionStorage (not localStorage: dies with the tab, so no
+// week-old selections resurface) because auth is a full-page round trip —
+// Google OAuth and the signup confirmation link leave and re-enter the app,
+// and an in-memory store would lose the match the user just built.
+export const useSetupStore = create<SetupStore>()(persist((set) => ({
   step: 0,
   setup: {},
   setStep: (step) => set({ step }),
@@ -51,7 +58,25 @@ export const useSetupStore = create<SetupStore>((set) => ({
   setBowlingOrderA: (bowling_order_a) => set((s) => ({ setup: { ...s.setup, bowling_order_a } })),
   setBowlingOrderB: (bowling_order_b) => set((s) => ({ setup: { ...s.setup, bowling_order_b } })),
   setToss: (toss_winner, toss_decision) => set((s) => ({ setup: { ...s.setup, toss_winner, toss_decision } })),
+  clearToss: () => set((s) => ({ setup: { ...s.setup, toss_winner: undefined, toss_decision: undefined } })),
+  // "Build a new match" after a finished game: keep the match conditions
+  // (format/stadium/pitch/time) so the user lands straight on team
+  // selection, but clear every team-specific choice — stale teams, orders
+  // and toss from the previous match must not leak into the new one.
+  resetForNewMatch: () => set((s) => ({
+    step: 3,
+    setup: {
+      format: s.setup.format,
+      total_overs: s.setup.total_overs,
+      stadium: s.setup.stadium,
+      pitch: s.setup.pitch,
+      time_of_play: s.setup.time_of_play,
+    },
+  })),
   reset: () => set({ step: 0, setup: {} }),
+}), {
+  name: 'quickcric-setup',
+  storage: createJSONStorage(() => sessionStorage),
 }))
 
 // ─────────────────────────────────────────────

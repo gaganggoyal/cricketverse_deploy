@@ -60,7 +60,13 @@ export class CricketEngine {
       SpotLight, ArcRotateCamera, MeshBuilder, StandardMaterial, PhysicsImpostor,
       ShadowGenerator, Animation, Mesh } = B
 
+    // Phones have far more pixels than GPU budget — rendering a 3× retina
+    // canvas at full resolution tanks the frame rate and heats the device.
+    // Render at ~2× CSS pixels max (still crisp at phone density) but keep
+    // antialiasing: dropping it made edges visibly jagged.
+    const isMobile = window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 768
     this.engine = new Engine(this.canvas, true, { preserveDrawingBuffer: true })
+    if (isMobile) this.engine.setHardwareScalingLevel(Math.min(1.5, Math.max(1, window.devicePixelRatio / 2)))
     this.scene  = new Scene(this.engine)
     this.scene.clearColor = new Color4(0.03, 0.05, 0.04, 1)
     this.scene.fogMode  = 3 // EXP2
@@ -69,6 +75,13 @@ export class CricketEngine {
 
     // ── CAMERA ──────────────────────────────────────────────────
     this.camera = new ArcRotateCamera('cam', -Math.PI/2, Math.PI/3.5, 55, Vector3.Zero(), this.scene)
+    // Portrait phones: the bottom ~40% of the screen is HUD (crease cards,
+    // commentary, scorebug), which sat right on top of the pitch. Shift the
+    // framed view upward so the action lives in the clear upper half.
+    if (isMobile) {
+      this.camera.radius = 62
+      this.camera.targetScreenOffset = new B.Vector2(0, 9)
+    }
     this.camera.attachControl(this.canvas, true)
     this.camera.lowerRadiusLimit  = 12
     this.camera.upperRadiusLimit  = 90
@@ -95,7 +108,7 @@ export class CricketEngine {
       spot.intensity = 3.5
       spot.diffuse   = new Color3(1, 0.97, 0.88)
       spot.range     = 140
-      const sg = new ShadowGenerator(1024, spot)
+      const sg = new ShadowGenerator(isMobile ? 512 : 1024, spot)
       sg.useBlurExponentialShadowMap = true
       shadows.push(sg)
     })

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSavedMatches, SavedMatch } from '@/lib/matchHistory'
+import { useSetupStore } from '@/lib/store'
 
 function formatDate(iso: string) {
   try {
@@ -85,13 +86,13 @@ export default function MatchesPage() {
           QUICK<span className="text-[var(--cream)]">CRIC</span>
         </div>
         <button
-          onClick={() => { setBuilding(true); router.push('/setup') }}
+          onClick={() => { setBuilding(true); useSetupStore.getState().reset(); router.push('/setup') }}
           disabled={building}
-          className="px-4 py-2 bg-[var(--gold)] text-white rounded-lg text-xs font-bold tracking-wider hover:bg-[var(--gold-light)] transition-all disabled:opacity-60"
+          className="shrink-0 ml-3 px-3 sm:px-4 py-2 bg-[var(--gold)] text-white rounded-lg text-[10px] sm:text-xs font-bold tracking-wider hover:bg-[var(--gold-light)] transition-all disabled:opacity-60"
         >
           {building
             ? <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin align-middle" />
-            : 'BUILD A NEW MATCH →'}
+            : <><span className="hidden sm:inline">BUILD A </span>NEW MATCH →</>}
         </button>
       </div>
 
