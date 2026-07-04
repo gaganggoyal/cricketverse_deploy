@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useLiveMatch, useSetupStore } from '@/lib/store'
 import { InningsScorecard } from '@/components/match/InningsScorecard'
+import { AdSlot } from '@/components/ads/AdSlot'
 import { inningsToCard, computePlayerOfMatch, saveMatch, getSavedMatches, InningsCard, SavedMatch } from '@/lib/matchHistory'
 
 function Spinner() {
@@ -145,6 +146,8 @@ export default function ResultPage() {
           <InningsScorecard card={cards[1]} />
         </div>
       )}
+
+      <AdSlot className="mb-6" />
 
       {/* Actions */}
       <div className="flex gap-3">

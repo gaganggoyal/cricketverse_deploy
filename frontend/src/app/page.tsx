@@ -114,6 +114,13 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        {/* Footer */}
+        <div className="mt-14 pt-6 border-t border-[var(--border)] w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] text-[var(--muted)]">
+          <span>© {new Date().getFullYear()} QuickCric</span>
+          <a href="/privacy" className="hover:text-[var(--cream)] underline">Privacy policy</a>
+          <a href="mailto:indiaoffers.in@gmail.com" className="hover:text-[var(--cream)] underline">Contact</a>
+        </div>
       </div>
     </div>
   )

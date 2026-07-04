@@ -45,6 +45,8 @@ services:
         NEXT_PUBLIC_SIM_URL:           ${NEXT_PUBLIC_SIM_URL}
         NEXT_PUBLIC_MP_URL:            ${NEXT_PUBLIC_MP_URL}
         NEXT_PUBLIC_APP_URL:           ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_ADSENSE_CLIENT:    ${NEXT_PUBLIC_ADSENSE_CLIENT:-}
+        NEXT_PUBLIC_ADSENSE_SLOT:      ${NEXT_PUBLIC_ADSENSE_SLOT:-}
     # Server-side code (Stripe webhooks, admin sync, middleware) still reads
     # secrets at runtime — build args above only cover the browser bundle.
     env_file: .env

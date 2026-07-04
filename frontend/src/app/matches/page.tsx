@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSavedMatches, SavedMatch } from '@/lib/matchHistory'
 import { useSetupStore } from '@/lib/store'
+import { AdSlot } from '@/components/ads/AdSlot'
 
 function formatDate(iso: string) {
   try {
@@ -122,6 +123,8 @@ export default function MatchesPage() {
             <MatchCard key={m.id} m={m} onOpen={() => router.push(`/result/${m.id}`)} />
           ))}
         </div>
+
+        <AdSlot className="mt-8" />
       </div>
     </div>
   )

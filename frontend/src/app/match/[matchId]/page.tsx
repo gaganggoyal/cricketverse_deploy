@@ -8,6 +8,7 @@ import { useVoiceCommentary } from '@/components/match/VoiceCommentary'
 import { playCrowdReaction } from '@/lib/crowdSound'
 import { simulateLocalInnings, computeLocalResult, fallbackBowlingPlan } from '@/lib/localSim'
 import { InningsScorecard } from '@/components/match/InningsScorecard'
+import { AdSlot } from '@/components/ads/AdSlot'
 import { inningsToCard } from '@/lib/matchHistory'
 import { BallEvent } from '@/types'
 
@@ -552,6 +553,10 @@ function BreakSummary({ innings1, target, setup, onProceed }: {
         </div>
 
         <InningsScorecard card={card} didNotBat={didNotBat} />
+
+        {/* The break is the one moment the viewer is idle — the only ad
+            surface inside the match experience. Never on the live field. */}
+        <AdSlot className="mt-6" />
       </div>
 
       {/* Sticky proceed bar with break countdown */}

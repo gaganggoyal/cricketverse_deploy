@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import { PWARegister } from '@/components/ui/PWARegister'
 import './globals.css'
+
+// Set at build time; the AdSense loader and every AdSlot stay off until then.
+const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 const APP_URL = 'https://cricketverse.app'
@@ -43,7 +47,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
-      <body className={inter.className}><PWARegister />{children}</body>
+      <body className={inter.className}>
+        <PWARegister />
+        {ADSENSE_CLIENT && (
+          <Script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+            crossOrigin="anonymous"
+            strategy="afterInteractive"
+          />
+        )}
+        {children}
+      </body>
     </html>
   )
 }
