@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSavedMatches, SavedMatch } from '@/lib/matchHistory'
+import { InstallAppButton } from '@/components/ui/InstallAppButton'
 
 const STEPS = [
   { n: '01', title: 'Pick your teams',   desc: 'IPL & WPL squads or your own custom XI from 200+ real players' },
@@ -61,6 +62,8 @@ export default function Home() {
             ? <span className="inline-flex items-center gap-3"><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> SETTING UP...</span>
             : 'BUILD YOUR MATCH →'}
         </button>
+
+        <InstallAppButton />
 
         {/* Previous matches — only shown once the user has actually played one */}
         {lastMatch && (
