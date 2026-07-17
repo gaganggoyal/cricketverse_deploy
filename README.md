@@ -2,6 +2,15 @@
 
 > **Why wait for real matches? Build your own with real players, real stats, AI-powered simulation, and a live 3D stadium.**
 
+**Live at [quickcric.online](https://quickcric.online)** — playable in the
+browser right now.
+
+> Built AI-first, and openly so — AI pair-programming is how one person ships
+> a 3D game, a physics sim and a realtime backend solo. Every design call
+> (what gets simulated, how, and what it costs) was mine.
+> [More ↓](#how-one-person-built-this) · Portfolio:
+> [gagan.indiaoffers.in](https://gagan.indiaoffers.in)
+
 ---
 
 ## What is CricketVerse?
@@ -321,4 +330,31 @@ npx cap open android     # opens Android Studio → Build → APK
 | Mobile | Capacitor (iOS + Android) |
 | CI/CD | GitHub Actions |
 
-# cricketverse_deploy
+---
+
+## How one person built this
+
+No pretending otherwise: this was built with AI pair-programming, a workflow
+I trained myself in — it's the only way a solo builder ships a Babylon.js
+stadium, a Python simulation engine and a realtime multiplayer backend in
+one project. The judgment calls, though, don't come from any scaffold:
+
+- **Stats drive everything** — the rule that Bumrah's yorker, Kohli's strike
+  rate and Rashid's googly must behave like their *real* career numbers is
+  the product thesis. A generic sim rolls dice; this one respects the
+  scorecard.
+- **Pressure index, stamina, pitch and weather** made the cut because
+  they're what actually decides real matches — a cricket watcher's call,
+  not a template's.
+- **The pricing tiers** are an operator's decision about what's free and
+  what's worth ₹299 — I've priced digital products for a decade.
+
+Built to learn by shipping something people actually play. The whole stack
+is here to read.
+
+---
+
+**Gagandeep Goyal** — e-commerce operator and solo builder; ships web
+products and AI agents end to end. Portfolio:
+[gagan.indiaoffers.in](https://gagan.indiaoffers.in) · GitHub:
+[@gaganggoyal](https://github.com/gaganggoyal)
