@@ -11,6 +11,25 @@ browser right now.
 > [More ↓](#how-one-person-built-this) · Portfolio:
 > [gagan.indiaoffers.in](https://gagan.indiaoffers.in)
 
+[![CI](https://github.com/gaganggoyal/cricketverse_deploy/actions/workflows/ci.yml/badge.svg)](https://github.com/gaganggoyal/cricketverse_deploy/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+## At a glance
+
+|  |  |
+|---|---|
+| **What** | Ball-by-ball cricket simulator driven by **real career statistics** (200+ international players), rendered live in a Babylon.js 3D stadium, with 2-player realtime multiplayer |
+| **Stack** | Next.js 14 · TypeScript · Babylon.js · Zustand — Python 3.12 · FastAPI · WebSocket + Socket.io — Supabase Postgres · Stripe · Docker + Caddy on a VPS |
+| **Live** | [quickcric.online](https://quickcric.online) — playable now |
+| **Tests** | 24 pytest cases on the engine (match completion, pitch/pressure effects, scorecard-correctness regressions) · GitHub Actions CI on every push |
+
+**Where to look first** (for reviewers):
+
+- [sim-engine/simulator.py](sim-engine/simulator.py) — the probability model: per-ball wicket/run odds from batter & bowler averages, stamina, pressure, pitch and weather
+- [frontend/src/components/match/MatchEngine3D.tsx](frontend/src/components/match/MatchEngine3D.tsx) — the Babylon.js stadium and ball-flight animation
+- [sim-engine/multiplayer/server.py](sim-engine/multiplayer/server.py) — Socket.io rooms for live 2-player matches
+- [database/](database/) — the schema, evolved in 4 phased migrations (billing → tournaments → analytics)
+
 ---
 
 ## What is CricketVerse?
