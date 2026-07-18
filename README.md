@@ -258,8 +258,21 @@ cd sim-engine
 pip install pytest pytest-asyncio
 python -m pytest tests/ -v
 
-# Expected: 19 passed ✓
+# Expected: 24 passed ✓
 ```
+
+The suite covers match completion, format lengths, pitch/pressure effects,
+scorecard structure, and ball-event fields — plus a **scorecard-correctness**
+regression set ([tests/test_scoring_fixes.py](sim-engine/tests/test_scoring_fixes.py))
+added after an engine audit turned up real bugs:
+
+| Bug | Symptom | Fix |
+|---|---|---|
+| Bowlers never credited with wickets | every bowling figure showed **0 wickets**; best-bowler and man-of-the-match were meaningless | dismissals now credit the bowler (run-outs excepted) |
+| Ball count off by one | a full innings read `18.1 / 109 balls` instead of the true delivery count | innings counts actual deliveries bowled |
+| `form=0` player | `ZeroDivisionError` mid-ball | guarded |
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs these on every push.
 
 ---
 

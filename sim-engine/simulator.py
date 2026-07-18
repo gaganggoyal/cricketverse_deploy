@@ -274,6 +274,7 @@ class CricketSimulator:
         total_runs = 0
         total_wickets = 0
         total_balls = 0
+        legal_balls = 0  # deliveries actually bowled — the true ball count
         ball_events: list[BallEvent] = []
         fall_of_wickets = []
         over_runs = []
@@ -340,10 +341,17 @@ class CricketSimulator:
                 )
                 ball_events.append(event)
                 bowler_state.balls_bowled += 1
+                legal_balls += 1
                 over_run_total += event.runs
 
                 if event.is_wicket:
                     total_wickets += 1
+                    # The delivery was faced, so it counts as a ball for the
+                    # dismissed batter's strike rate.
+                    batter_state.balls += 1
+                    # Credit the bowler — but a run-out is not their wicket.
+                    if event.wicket_type != "Run out":
+                        bowler_state.wickets += 1
                     fall_of_wickets.append({
                         "wicket": total_wickets,
                         "score": total_runs + event.runs,
@@ -425,8 +433,8 @@ class CricketSimulator:
             "bowling_team": bowling_team,
             "total": total_runs,
             "wickets": total_wickets,
-            "overs": f"{total_balls // 6}.{total_balls % 6}",
-            "balls": total_balls,
+            "overs": f"{legal_balls // 6}.{legal_balls % 6}",
+            "balls": legal_balls,
             "target": (total_runs + 1) if not target else None,
             "over_runs": over_runs,
             "fall_of_wickets": fall_of_wickets,
@@ -481,7 +489,7 @@ class CricketSimulator:
         p_four *= avg_factor
 
         # Form influence
-        form_f = batter.player.form / 75.0
+        form_f = max(batter.player.form, 1) / 75.0  # guard against form=0 → div-by-zero
         p_six  *= form_f
         p_four *= form_f
         p_wkt  /= form_f
