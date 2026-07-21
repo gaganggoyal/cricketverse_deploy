@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getLeaderboard } from '@/lib/api'
 
 interface LeaderEntry {
   player_name: string
@@ -22,62 +22,27 @@ export default function LeaderboardPage() {
   const loadLeaderboard = async () => {
     setLoading(true)
     try {
-      // Query balls table to compute sim leaderboard
+      // The aggregation used to happen here in the browser, over 500 raw
+      // `balls` rows. It is now a GROUP BY behind /api/leaderboard, so the
+      // response is already the top 20.
       if (tab === 'batters') {
-        const { data: rows } = await supabase
-          .from('balls')
-          .select('batter_id, runs_scored, players(name, flag_emoji, country)')
-          .eq('is_wicket', false)
-          .not('batter_id', 'is', null)
-          .limit(500)
-
-        if (rows) {
-          const agg: Record<string, any> = {}
-          rows.forEach((r: any) => {
-            const k = r.batter_id
-            if (!agg[k]) agg[k] = { runs: 0, balls: 0, name: r.players?.name, flag: r.players?.flag_emoji, country: r.players?.country }
-            agg[k].runs  += r.runs_scored
-            agg[k].balls += 1
-          })
-          const sorted = Object.values(agg)
-            .sort((a: any, b: any) => b.runs - a.runs)
-            .slice(0, 20)
-            .map((x: any) => ({
-              player_name: x.name,
-              flag:        x.flag,
-              country:     x.country,
-              value:       x.runs,
-              sub:         `${x.balls} balls · SR ${x.balls > 0 ? ((x.runs / x.balls) * 100).toFixed(0) : '—'}`,
-            }))
-          setData(sorted)
-        }
+        const rows = await getLeaderboard('batters', 20)
+        setData(rows.map((x: any) => ({
+          player_name: x.name,
+          flag:        x.flag_emoji,
+          country:     x.country,
+          value:       x.total_runs ?? 0,
+          sub:         `${x.balls_faced} balls · SR ${x.strike_rate ?? '—'}`,
+        })))
       } else if (tab === 'bowlers') {
-        const { data: rows } = await supabase
-          .from('balls')
-          .select('bowler_id, is_wicket, players!balls_bowler_id_fkey(name, flag_emoji, country)')
-          .not('bowler_id', 'is', null)
-          .limit(500)
-
-        if (rows) {
-          const agg: Record<string, any> = {}
-          rows.forEach((r: any) => {
-            const k = r.bowler_id
-            if (!agg[k]) agg[k] = { wkts: 0, balls: 0, name: r.players?.name, flag: r.players?.flag_emoji, country: r.players?.country }
-            if (r.is_wicket) agg[k].wkts++
-            agg[k].balls++
-          })
-          const sorted = Object.values(agg)
-            .sort((a: any, b: any) => b.wkts - a.wkts)
-            .slice(0, 20)
-            .map((x: any) => ({
-              player_name: x.name,
-              flag:        x.flag,
-              country:     x.country,
-              value:       x.wkts,
-              sub:         `${(x.balls/6).toFixed(1)} overs · SR ${x.wkts > 0 ? (x.balls / x.wkts).toFixed(1) : '—'}`,
-            }))
-          setData(sorted)
-        }
+        const rows = await getLeaderboard('bowlers', 20)
+        setData(rows.map((x: any) => ({
+          player_name: x.name,
+          flag:        x.flag_emoji,
+          country:     x.country,
+          value:       x.total_wickets ?? 0,
+          sub:         `${x.overs} overs · Econ ${x.economy ?? '—'}`,
+        })))
       }
     } catch (e) {
       // Fallback with static sample data

@@ -29,7 +29,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-bold mb-1">Data we collect</h2>
             <ul className="list-disc pl-5 space-y-1">
-              <li><span className="font-medium">Account data</span> — if you sign up, we store your email address and a display name with our authentication provider (Supabase).</li>
+              <li><span className="font-medium">Account data</span> — if you sign up, we store your email address, a display name, and your password on our own server. Passwords are hashed with bcrypt and are never stored in readable form.</li>
               <li><span className="font-medium">Match history</span> — scorecards of matches you simulate, linked to your account if signed in, otherwise kept only in your browser&apos;s local storage.</li>
               <li><span className="font-medium">Technical data</span> — standard server logs (IP address, browser type) used for security and to keep the service running.</li>
             </ul>
@@ -63,9 +63,12 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-bold mb-1">Third-party services</h2>
             <ul className="list-disc pl-5 space-y-1">
-              <li><span className="font-medium">Supabase</span> — authentication and database hosting.</li>
               <li><span className="font-medium">Google AdSense</span> — advertising.</li>
             </ul>
+            <p className="mt-2">
+              Accounts, match history and all other application data are stored on our own
+              server. We do not use a third-party authentication or database provider.
+            </p>
           </section>
 
           <section>

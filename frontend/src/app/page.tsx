@@ -16,7 +16,7 @@ export default function Home() {
   const [navigating, setNavigating] = useState<'build' | 'matches' | null>(null)
   const [lastMatch, setLastMatch] = useState<SavedMatch | null>(null)
 
-  // Match history: Supabase when signed in, localStorage otherwise —
+  // Match history: MySQL when signed in, localStorage otherwise —
   // read after mount. New users (no matches yet) see no history button.
   useEffect(() => {
     getSavedMatches()

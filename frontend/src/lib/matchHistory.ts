@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────
 // Match history + scorecard snapshots.
-// Signed-in users get their history in Supabase (match_history table,
-// see database/005_match_history.sql) so it follows the account across
+// Signed-in users get their history in MySQL (match_history table, see
+// database/mysql/001_schema.sql) so it follows the account across
 // devices. localStorage remains as the fallback — signed-out sessions
-// and any DB failure (e.g. the migration not applied yet) degrade to
-// device-local history instead of losing the match.
+// and any API failure degrade to device-local history instead of losing
+// the match.
 // ─────────────────────────────────────────────────────────────────
-import { supabase } from '@/lib/supabase'
+import { auth, fetchMatchHistory, saveMatchHistory } from '@/lib/api'
 import { InningsState } from '@/types'
 
 export interface ScorecardBatRow {
@@ -74,7 +74,7 @@ function localSave(match: SavedMatch) {
   }
 }
 
-// ── Supabase row mapping ──────────────────────────────────────────
+// ── Row mapping ───────────────────────────────────────────────────
 function rowToSaved(row: any): SavedMatch {
   return {
     id: row.id,
@@ -90,10 +90,10 @@ function rowToSaved(row: any): SavedMatch {
   }
 }
 
-function savedToRow(m: SavedMatch, userId: string) {
+// user_id is no longer sent: the API derives it from the session cookie.
+function savedToRow(m: SavedMatch) {
   return {
     id: m.id,
-    user_id: userId,
     played_at: m.playedAt,
     format: m.format,
     stadium: m.stadium,
@@ -106,52 +106,44 @@ function savedToRow(m: SavedMatch, userId: string) {
   }
 }
 
-async function currentUserId(): Promise<string | null> {
-  try {
-    const { data } = await supabase.auth.getUser()
-    return data.user?.id ?? null
-  } catch {
-    return null
-  }
+async function signedIn(): Promise<boolean> {
+  return (await auth.getUser()) !== null
 }
 
 // Matches saved to localStorage before sign-in (or before the migration
 // ran) get adopted into the account the first time history is read while
 // signed in, then the local copy is cleared.
-async function adoptLocalMatches(userId: string) {
+async function adoptLocalMatches() {
   const locals = localGet()
   if (!locals.length) return
-  const { error } = await supabase
-    .from('match_history')
-    .upsert(locals.map(m => savedToRow(m, userId)))
-  if (!error) localStorage.removeItem(KEY)
+  try {
+    await saveMatchHistory(locals.map(savedToRow))
+    localStorage.removeItem(KEY)
+  } catch {
+    // Leave the local copy in place — it is retried on the next read.
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────
 export async function getSavedMatches(): Promise<SavedMatch[]> {
-  const userId = await currentUserId()
-  if (!userId) return localGet()
+  if (!(await signedIn())) return localGet()
   try {
-    await adoptLocalMatches(userId)
-    const { data, error } = await supabase
-      .from('match_history')
-      .select('*')
-      .order('played_at', { ascending: false })
-      .limit(MAX)
-    if (error) throw error
-    return (data ?? []).map(rowToSaved)
+    await adoptLocalMatches()
+    const rows = await fetchMatchHistory(MAX)
+    return rows.map(rowToSaved)
   } catch {
     return localGet()
   }
 }
 
 export async function saveMatch(match: SavedMatch): Promise<void> {
-  const userId = await currentUserId()
-  if (userId) {
-    const { error } = await supabase
-      .from('match_history')
-      .upsert(savedToRow(match, userId))
-    if (!error) return
+  if (await signedIn()) {
+    try {
+      await saveMatchHistory(savedToRow(match))
+      return
+    } catch {
+      // Fall through to device-local storage rather than lose the match.
+    }
   }
   localSave(match)
 }

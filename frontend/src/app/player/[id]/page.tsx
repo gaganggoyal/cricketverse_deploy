@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getPlayerWithCareer } from '@/lib/api'
 
 export default function PlayerProfilePage() {
   const { id }    = useParams() as { id: string }
@@ -11,13 +11,12 @@ export default function PlayerProfilePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      supabase.from('players').select('*').eq('id', id).single(),
-      supabase.from('player_sim_career').select('*').eq('id', id).single(),
-    ]).then(([pRes, cRes]) => {
-      setPlayer(pRes.data)
-      setCareer(cRes.data)
-    }).finally(() => setLoading(false))
+    // Both rows come back from one request now — the endpoint joins the
+    // player against its simulated-career aggregate.
+    getPlayerWithCareer(id)
+      .then(({ player, career }) => { setPlayer(player); setCareer(career) })
+      .catch(() => { setPlayer(null); setCareer(null) })
+      .finally(() => setLoading(false))
   }, [id])
 
   if (loading) return (

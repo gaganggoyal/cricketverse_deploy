@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { Player } from '@/types'
-import { searchPlayers } from '@/lib/supabase'
+import { searchPlayers } from '@/lib/api'
 
 interface Message { role: 'user' | 'assistant'; content: string }
 

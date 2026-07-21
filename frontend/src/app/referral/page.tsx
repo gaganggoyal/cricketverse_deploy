@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { auth, getReferralData } from '@/lib/api'
 
 export default function ReferralPage() {
   const router  = useRouter()
@@ -11,13 +11,16 @@ export default function ReferralPage() {
   const [refs,   setRefs]   = useState<any[]>([])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    auth.getUser().then(async (user) => {
       if (!user) { router.push('/auth/login'); return }
       setUser(user)
-      supabase.from('user_profiles').select('*').eq('id', user.id).single()
-        .then(({ data }) => setProfile(data))
-      supabase.from('referrals').select('*').eq('referrer_id', user.id)
-        .then(({ data }) => setRefs(data ?? []))
+      try {
+        const { profile, referrals } = await getReferralData()
+        setProfile(profile)
+        setRefs(referrals)
+      } catch {
+        setRefs([])
+      }
     })
   }, [])
 

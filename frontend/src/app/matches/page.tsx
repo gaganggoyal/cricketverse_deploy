@@ -71,7 +71,7 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<SavedMatch[] | null>(null)
   const [building, setBuilding] = useState(false)
 
-  // Supabase when signed in, localStorage otherwise — load after mount.
+  // MySQL when signed in, localStorage otherwise — load after mount.
   useEffect(() => {
     getSavedMatches().then(setMatches).catch(() => setMatches([]))
   }, [])

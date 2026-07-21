@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getUserMatches, getLeaderboard } from '@/lib/api'
 
 interface MatchStat {
   id: string
@@ -177,13 +177,13 @@ export default function AnalyticsPage() {
   const [tab,         setTab]         = useState<'overview'|'players'|'shots'|'trends'>('overview')
 
   useEffect(() => {
+    // Matches are the signed-in user's own; the batting board is global.
     Promise.all([
-      supabase.from('matches').select('*').eq('status','complete').order('created_at',{ascending:false}).limit(50),
-      // Leaderboard views built in Phase 3 migration
-      supabase.from('leaderboard_batters').select('*').limit(10),
-    ]).then(([matchRes, playerRes]) => {
-      setMatches(matchRes.data ?? [])
-      setPlayerStats((playerRes.data ?? []) as any)
+      getUserMatches(),
+      getLeaderboard('batters', 10),
+    ]).then(([matchRows, playerRows]) => {
+      setMatches(matchRows.filter((m: any) => m.status === 'complete'))
+      setPlayerStats(playerRows as any)
     }).catch(() => {
       setMatches(DEMO_MATCHES)
       setPlayerStats(DEMO_PLAYERS)

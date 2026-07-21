@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { auth } from '@/lib/api'
 
 type RoomStatus = 'idle' | 'waiting' | 'drafting' | 'playing' | 'finished'
 
@@ -35,7 +35,7 @@ export default function MultiplayerPage() {
   const MP_URL = process.env.NEXT_PUBLIC_MP_URL ?? 'ws://localhost:8001'
 
   useEffect(() => {
-    supabase.auth.getUser().then(({data:{user}}) => setUser(user))
+    auth.getUser().then(setUser)
   }, [])
 
   // Connect WebSocket

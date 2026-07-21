@@ -19,7 +19,7 @@ browser right now.
 |  |  |
 |---|---|
 | **What** | Ball-by-ball cricket simulator driven by **real career statistics** (200+ international players), rendered live in a Babylon.js 3D stadium, with 2-player realtime multiplayer |
-| **Stack** | Next.js 14 · TypeScript · Babylon.js · Zustand — Python 3.12 · FastAPI · WebSocket + Socket.io — Supabase Postgres · Stripe · Docker + Caddy on a VPS |
+| **Stack** | Next.js 14 · TypeScript · Babylon.js · Zustand — Python 3.12 · FastAPI · WebSocket + Socket.io — self-hosted MySQL 8 · Stripe · Docker + Caddy on a VPS |
 | **Live** | [quickcric.online](https://quickcric.online) — playable now |
 | **Tests** | 24 pytest cases on the engine (match completion, pitch/pressure effects, scorecard-correctness regressions) · GitHub Actions CI on every push |
 
@@ -55,7 +55,7 @@ CricketVerse lets you pick any 11 from 200+ real international cricketers, choos
 | 🏆 Tournament mode | Round robin, knockout, group stage |
 | 🎯 AI Coach | Claude-powered tactical assistant |
 | 📊 Analytics | Wagon wheel, radar charts, win/loss trends |
-| 🔔 Notifications | Real-time Supabase push notifications |
+| 🔔 Notifications | In-app toasts + unread badge (30s poll) |
 | 🏅 Achievements | 12 unlockable badges |
 | 💳 Billing | Stripe Free / Pro (₹299) / Elite (₹799) |
 | 📱 Mobile | PWA + Capacitor iOS/Android wrapper |
@@ -123,7 +123,9 @@ cricketverse/
 │   │   │   └── useMatchWebSocket.ts     ← WebSocket connection hook
 │   │   │
 │   │   ├── lib/
-│   │   │   ├── supabase.ts      ← Supabase client + all DB queries
+│   │   │   ├── db.ts           ← MySQL pool (server-only)
+│   │   │   ├── auth-server.ts  ← bcrypt + session cookies (server-only)
+│   │   │   ├── api.ts           ← Browser data access — fetches /api/*
 │   │   │   ├── store.ts         ← Zustand global state (setup + match)
 │   │   │   └── analytics.ts     ← Event tracker + admin analytics
 │   │   │
@@ -169,10 +171,11 @@ cd cricketverse
 
 # 1. Set up environment
 cp .env.example .env
-# Edit .env and fill in: Supabase URL/keys + ANTHROPIC_API_KEY (minimum required)
+# Edit .env and fill in: DB_* credentials + ANTHROPIC_API_KEY (minimum required)
 
-# 2. Run database migrations in Supabase SQL editor (supabase.com → your project → SQL editor)
-# Run in order: database/schema.sql → 002_phase3.sql → 003_phase4.sql → 004_phase5.sql
+# 2. Apply the schema to your MySQL 8 database
+mysql -u quickcric -p quickcric < database/mysql/001_schema.sql
+mysql -u quickcric -p quickcric < database/mysql/002_seed.sql
 
 # 3. Start everything
 docker compose up --build
@@ -207,16 +210,21 @@ npm run dev
 
 ---
 
-## Database setup (Supabase)
+## Database setup (self-hosted MySQL 8)
 
-1. Create a free project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** in your project dashboard
-3. Run the migration files **in order**:
-   - `database/schema.sql` — core tables + 30 seed players
-   - `database/002_phase3.sql` — Stripe billing, form tracking
-   - `database/003_phase4.sql` — tournaments, fantasy, multiplayer, achievements
-   - `database/004_phase5.sql` — analytics, feature flags, referrals
-4. Copy your **Project URL** and **anon key** into `.env`
+1. Create the database and a user:
+   ```bash
+   mysql -e "CREATE DATABASE quickcric CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+             CREATE USER 'quickcric'@'localhost' IDENTIFIED BY 'a-strong-password';
+             GRANT ALL PRIVILEGES ON quickcric.* TO 'quickcric'@'localhost';"
+   ```
+2. Apply the schema, then the seed data:
+   - `database/mysql/001_schema.sql` — all 22 tables + 5 views
+   - `database/mysql/002_seed.sql` — stadiums, sample players, achievements, feature flags
+3. Put the credentials in `.env` as `DB_USER` / `DB_PASSWORD` / `DB_NAME`.
+
+The `database/*.sql` files in the parent directory are the original
+Supabase Postgres schema, kept for reference only.
 
 ---
 
@@ -224,13 +232,12 @@ npm run dev
 
 | Service | Purpose | Get it |
 |---|---|---|
-| **Supabase** | Database + auth + realtime | [supabase.com](https://supabase.com) — free |
 | **Anthropic** | AI commentary + AI Coach | [console.anthropic.com](https://console.anthropic.com) |
 | **CricAPI** | Real player stats | [cricapi.com](https://cricapi.com) — 100 req/day free |
 | **Stripe** | Billing (optional) | [stripe.com](https://stripe.com) |
 | **ElevenLabs** | Premium voice (optional) | [elevenlabs.io](https://elevenlabs.io) |
 
-**Minimum to run:** Supabase + Anthropic API key only. Everything else is optional.
+**Minimum to run:** a local MySQL 8 + an Anthropic API key. Everything else is optional.
 
 ---
 
@@ -353,8 +360,8 @@ npx cap open android     # opens Android Studio → Build → APK
 | State | Zustand |
 | Sim Engine | Python 3.12, FastAPI, uvicorn |
 | Realtime | WebSocket (FastAPI + Socket.io) |
-| Database | PostgreSQL via Supabase |
-| Auth | Supabase Auth (Google OAuth + email) |
+| Database | MySQL 8, self-hosted |
+| Auth | Own — bcrypt + httpOnly session cookies |
 | AI | Claude API (Anthropic) |
 | Billing | Stripe |
 | Voice | Web Speech API + ElevenLabs |

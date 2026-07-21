@@ -1,8 +1,13 @@
 """
-CricketVerse — CricAPI Player Sync Service
+QuickCric — CricAPI Player Sync Service
 ============================================
-Fetches real player stats from CricAPI and upserts into Supabase.
+Fetches real player stats from CricAPI and upserts into MySQL.
 Run this as a scheduled job (daily cron) to keep player data fresh.
+
+Writes go straight to MySQL. This previously POSTed to Supabase's
+PostgREST endpoint using a service key; our own database has no such
+HTTP layer in front of it, and needs none — this script runs on the
+same host.
 
 CricAPI docs: https://www.cricapi.com/
 Free tier: 100 req/day · Paid: 10,000 req/day
@@ -12,11 +17,28 @@ import os, asyncio, httpx, json, math
 from typing import Optional
 from dataclasses import dataclass, asdict
 
+import aiomysql
+
 CRICAPI_KEY   = os.environ.get("CRICAPI_KEY", "")
-SUPABASE_URL  = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
-SUPABASE_KEY  = os.environ.get("SUPABASE_SERVICE_KEY", "")   # service key for write
+
+# Same connection settings the Next.js app uses — see frontend/src/lib/db.ts.
+DB_SOCKET     = os.environ.get("DB_SOCKET", "")
+DB_HOST       = os.environ.get("DB_HOST", "127.0.0.1")
+DB_PORT       = int(os.environ.get("DB_PORT", "3306"))
+DB_USER       = os.environ.get("DB_USER", "quickcric")
+DB_PASSWORD   = os.environ.get("DB_PASSWORD", "")
+DB_NAME       = os.environ.get("DB_NAME", "quickcric")
 
 CRICAPI_BASE  = "https://api.cricapi.com/v1"
+
+
+async def db_connect():
+    """Open a MySQL connection, over the unix socket when one is configured."""
+    common = dict(user=DB_USER, password=DB_PASSWORD, db=DB_NAME,
+                  charset="utf8mb4", autocommit=True)
+    if DB_SOCKET:
+        return await aiomysql.connect(unix_socket=DB_SOCKET, **common)
+    return await aiomysql.connect(host=DB_HOST, port=DB_PORT, **common)
 
 # ── Known player CricAPI IDs (top 200 international cricketers) ──
 PLAYER_IDS = {
@@ -109,7 +131,7 @@ FLAG_MAP = {
 
 def cricapi_to_player_row(raw: dict) -> dict:
     """
-    Transform raw CricAPI player object → our Supabase players schema.
+    Transform raw CricAPI player object → our MySQL players schema.
     CricAPI returns nested stats under `data.stats`.
     """
     name    = raw.get("name", "Unknown")
@@ -249,28 +271,56 @@ async def fetch_player(client: httpx.AsyncClient, player_id: str, name: str) -> 
         return None
 
 
-async def upsert_player(client: httpx.AsyncClient, row: dict) -> bool:
-    """Upsert player row into Supabase via REST API."""
+# List-valued columns are JSON in MySQL, so they must be serialised
+# rather than passed through as Python lists.
+JSON_COLUMNS = ("formats", "bat_preferred_shots", "bat_weakness", "bowl_variations")
+
+# Natural key for the upsert. players.id is a generated UUID, so a repeat
+# sync has to match on the name instead — hence the unique index below.
+UPSERT_SQL = """
+INSERT INTO players (
+  name, country, country_code, flag_emoji, formats, role, batting_style, bowling_style,
+  bat_avg, bat_sr, bat_hs, bat_style, bat_preferred_shots, bat_weakness,
+  bat_vs_spin, bat_vs_pace, bowl_avg, bowl_economy, bowl_type, bowl_variations,
+  stamina, form, pressure_handling, fitness,
+  home_flat, home_spin, home_seam, home_bouncy, skill_description, jersey_number
+) VALUES (
+  %(name)s, %(country)s, %(country_code)s, %(flag_emoji)s, %(formats)s, %(role)s,
+  %(batting_style)s, %(bowling_style)s,
+  %(bat_avg)s, %(bat_sr)s, %(bat_hs)s, %(bat_style)s, %(bat_preferred_shots)s, %(bat_weakness)s,
+  %(bat_vs_spin)s, %(bat_vs_pace)s, %(bowl_avg)s, %(bowl_economy)s, %(bowl_type)s, %(bowl_variations)s,
+  %(stamina)s, %(form)s, %(pressure_handling)s, %(fitness)s,
+  %(home_flat)s, %(home_spin)s, %(home_seam)s, %(home_bouncy)s, %(skill_description)s, %(jersey_number)s
+)
+ON DUPLICATE KEY UPDATE
+  country = VALUES(country), country_code = VALUES(country_code),
+  flag_emoji = VALUES(flag_emoji), formats = VALUES(formats), role = VALUES(role),
+  batting_style = VALUES(batting_style), bowling_style = VALUES(bowling_style),
+  bat_avg = VALUES(bat_avg), bat_sr = VALUES(bat_sr), bat_hs = VALUES(bat_hs),
+  bat_style = VALUES(bat_style),
+  bowl_avg = VALUES(bowl_avg), bowl_economy = VALUES(bowl_economy),
+  bowl_type = VALUES(bowl_type),
+  stamina = VALUES(stamina), form = VALUES(form),
+  skill_description = VALUES(skill_description)
+"""
+
+
+async def upsert_player(conn, row: dict) -> bool:
+    """Upsert a player row into MySQL, keyed on name."""
+    payload = dict(row)
+    for col in JSON_COLUMNS:
+        payload[col] = json.dumps(payload.get(col) or [])
     try:
-        r = await client.post(
-            f"{SUPABASE_URL}/rest/v1/players",
-            headers={
-                "apikey":        SUPABASE_KEY,
-                "Authorization": f"Bearer {SUPABASE_KEY}",
-                "Content-Type":  "application/json",
-                "Prefer":        "resolution=merge-duplicates,return=minimal",
-            },
-            json=row,
-            timeout=10,
-        )
-        return r.status_code in [200, 201]
+        async with conn.cursor() as cur:
+            await cur.execute(UPSERT_SQL, payload)
+        return True
     except Exception as e:
         print(f"  ✗ upsert failed: {e}")
         return False
 
 
 async def sync_all_players():
-    """Main sync: fetch all players from CricAPI and push to Supabase."""
+    """Main sync: fetch all players from CricAPI and push to MySQL."""
     if not CRICAPI_KEY:
         print("⚠️  CRICAPI_KEY not set — using static seed data instead")
         return
@@ -281,7 +331,7 @@ async def sync_all_players():
     # Limit concurrency to respect API rate limits
     sem = asyncio.Semaphore(3)
 
-    async def process(name: str, pid: str):
+    async def process(client, conn, name: str, pid: str):
         nonlocal ok, fail
         async with sem:
             print(f"  → Fetching {name}...")
@@ -291,7 +341,7 @@ async def sync_all_players():
                 return
             try:
                 row = cricapi_to_player_row(raw)
-                success = await upsert_player(client, row)
+                success = await upsert_player(conn, row)
                 if success:
                     ok += 1
                     print(f"  ✓ {name} — avg:{row['bat_avg']} sr:{row['bat_sr']}")
@@ -302,15 +352,19 @@ async def sync_all_players():
                 fail += 1
             await asyncio.sleep(0.5)   # rate limit buffer
 
-    async with httpx.AsyncClient() as client:
-        tasks = [process(name, pid) for name, pid in PLAYER_IDS.items()]
-        await asyncio.gather(*tasks)
+    conn = await db_connect()
+    try:
+        async with httpx.AsyncClient() as client:
+            tasks = [process(client, conn, name, pid) for name, pid in PLAYER_IDS.items()]
+            await asyncio.gather(*tasks)
+    finally:
+        conn.close()
 
     print(f"\n✅ Sync complete — {ok} ok, {fail} failed")
 
 
 # ─────────────────────────────────────────────────────────────────
-# PLAYER SEARCH (used by sim engine when Supabase is unavailable)
+# PLAYER SEARCH (used by sim engine when the database is unavailable)
 # ─────────────────────────────────────────────────────────────────
 
 async def search_cricapi(query: str, limit: int = 10) -> list[dict]:

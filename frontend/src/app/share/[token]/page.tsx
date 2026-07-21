@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getMatchByShareToken } from '@/lib/api'
 
 export default function SharePage() {
   const { token }  = useParams() as { token: string }
@@ -11,15 +11,10 @@ export default function SharePage() {
   const [copied,   setCopied]  = useState(false)
 
   useEffect(() => {
-    supabase
-      .from('matches')
-      .select('*, stadiums(name,city)')
-      .eq('share_token', token)
-      .eq('is_public', true)
-      .single()
-      // Supabase's query builder is a PromiseLike without .catch — pass
-      // the rejection handler as .then's second argument instead.
-      .then(({ data }) => { setMatch(data); setLoading(false) }, () => setLoading(false))
+    getMatchByShareToken(token)
+      .then(setMatch)
+      .catch(() => setMatch(null))
+      .finally(() => setLoading(false))
   }, [token])
 
   const copyLink = () => {
@@ -75,7 +70,7 @@ export default function SharePage() {
         </div>
         <div className="text-[var(--cream)] text-base mb-1">{match.win_margin}</div>
         <div className="text-xs text-[var(--muted)]">
-          {match.format} · {match.stadiums?.name ?? 'Unknown Stadium'} · {match.pitch_type} pitch
+          {match.format} · {match.stadium_name ?? 'Unknown Stadium'} · {match.pitch_type} pitch
         </div>
       </div>
 

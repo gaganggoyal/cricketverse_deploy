@@ -1,58 +1,40 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// ── SERVER CLIENT (for Server Components & Route Handlers) ────────
-export function createClient(cookieStore: any) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string)                                { return cookieStore.get(name)?.value },
-        set(name: string, value: string, options: any)   { try { cookieStore.set({ name, value, ...options }) } catch {} },
-        remove(name: string, options: any)               { try { cookieStore.set({ name, value: '', ...options }) } catch {} },
-      },
-    }
-  )
-}
+// ─────────────────────────────────────────────────────────────────
+// Route protection.
+//
+// Middleware runs on the Edge runtime, which cannot open a MySQL
+// connection, so this can only check that a session cookie is *present* —
+// it cannot verify that the session is real. That is deliberate and
+// sufficient: this redirect exists for UX (don't render a dashboard shell
+// to a signed-out visitor), while the actual enforcement lives in the API
+// routes, every one of which calls requireUser() and re-reads the session
+// from the database. A forged cookie gets an empty page and a 401, not data.
+// ─────────────────────────────────────────────────────────────────
 
-// ── MIDDLEWARE ────────────────────────────────────────────────────
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } })
+const SESSION_COOKIE = 'qc_session'
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string)                            { return request.cookies.get(name)?.value },
-        set(name: string, value: string, opt: any)   { request.cookies.set({ name, value, ...opt }); response = NextResponse.next({ request: { headers: request.headers } }); response.cookies.set({ name, value, ...opt }) },
-        remove(name: string, opt: any)               { request.cookies.set({ name, value: '', ...opt }); response = NextResponse.next({ request: { headers: request.headers } }); response.cookies.set({ name, value: '', ...opt }) },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Protect dashboard & match routes. Segment-aware matching: a bare
-  // startsWith('/match') would also capture /matches (the local, public
-  // match-history page).
+export function middleware(request: NextRequest) {
+  // Segment-aware matching: a bare startsWith('/match') would also capture
+  // /matches (the local, public match-history page).
   const protectedPaths = ['/dashboard', '/match', '/leaderboard']
-  const isProtected = protectedPaths.some(p =>
-    request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(p + '/'))
+  const { pathname } = request.nextUrl
+  const isProtected = protectedPaths.some(p => pathname === p || pathname.startsWith(p + '/'))
 
-  if (isProtected && !user) {
+  if (isProtected && !request.cookies.get(SESSION_COOKIE)?.value) {
     // Carry the destination along so sign-in drops the user back where
     // they were headed (e.g. straight into the match they just built),
     // not on the dashboard.
     const login = new URL('/auth/login', request.url)
-    login.searchParams.set('redirect', request.nextUrl.pathname)
+    login.searchParams.set('redirect', pathname)
     return NextResponse.redirect(login)
   }
 
-  return response
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // /api is excluded: those routes authorise themselves and must be able
+  // to return 401 JSON rather than a redirect to an HTML login page.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
 }

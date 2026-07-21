@@ -8,16 +8,15 @@ COPY . .
 # NEXT_PUBLIC_* values are inlined into the client bundle AT BUILD TIME —
 # passing them at container runtime does nothing. docker-compose.prod.yml
 # forwards them from .env as build args.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Database credentials are deliberately NOT build args: they are read at
+# runtime by server-only code, and a NEXT_PUBLIC_* database key is exactly
+# the pattern this migration removed.
 ARG NEXT_PUBLIC_SIM_URL
 ARG NEXT_PUBLIC_MP_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_ADSENSE_CLIENT
 ARG NEXT_PUBLIC_ADSENSE_SLOT
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
-    NEXT_PUBLIC_SIM_URL=$NEXT_PUBLIC_SIM_URL \
+ENV NEXT_PUBLIC_SIM_URL=$NEXT_PUBLIC_SIM_URL \
     NEXT_PUBLIC_MP_URL=$NEXT_PUBLIC_MP_URL \
     NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_ADSENSE_CLIENT=$NEXT_PUBLIC_ADSENSE_CLIENT \

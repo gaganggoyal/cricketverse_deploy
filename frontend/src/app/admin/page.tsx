@@ -2,7 +2,7 @@
 /**
  * QuickCric Admin Dashboard
  * ─────────────────────────────
- * Protected /admin route — requires admin role in Supabase.
+ * Protected /admin route — requires a row in the admin_users table.
  * Features:
  *  - Real-time active matches monitor
  *  - User growth + revenue charts
@@ -13,7 +13,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getAdminOverview, searchPlayers } from '@/lib/api'
 
 interface AdminStats {
   totalUsers:      number
@@ -69,36 +69,35 @@ export default function AdminPage() {
     })
   }, [])
 
+  // The real gate is server-side: /api/admin/* calls requireAdmin(), which
+  // checks the admin_users table. This only decides whether to render the
+  // page, so a non-admin who forces their way here gets 403s and no data.
+  // The old check ran entirely in the browser against a `plan` column and
+  // was trivially bypassable.
   const checkAdminAccess = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return false
-    const { data } = await supabase.from('user_profiles').select('plan').eq('id', user.id).single()
-    // In production, check a separate admin_users table or Supabase role
-    return data?.plan === 'admin' || user.email?.endsWith('@cricketverse.app')
+    try {
+      await getAdminOverview()
+      return true
+    } catch {
+      return false
+    }
   }
 
   const loadAll = async () => {
     setLoading(true)
     try {
-      const [usersRes, matchesRes] = await Promise.all([
-        supabase.from('user_profiles').select('*').order('created_at', { ascending: false }).limit(50),
-        supabase.from('matches').select('status,created_at,user_id').order('created_at', { ascending: false }).limit(200),
-      ])
-
-      const allUsers   = usersRes.data   ?? []
-      const allMatches = matchesRes.data ?? []
-      const today      = new Date().toDateString()
+      const { users: allUsers, totals } = await getAdminOverview()
 
       setUsers(allUsers)
       setStats({
-        totalUsers:        allUsers.length,
-        activeToday:       allUsers.filter(u => new Date(u.last_active_at ?? u.updated_at).toDateString() === today).length,
-        matchesTotal:      allMatches.length,
-        matchesToday:      allMatches.filter(m => new Date(m.created_at).toDateString() === today).length,
-        proUsers:          allUsers.filter(u => u.plan === 'pro').length,
-        eliteUsers:        allUsers.filter(u => u.plan === 'elite').length,
-        mrrUsd:            allUsers.filter(u => u.plan === 'pro').length * 3.49 + allUsers.filter(u => u.plan === 'elite').length * 9.49,
-        avgMatchesPerUser: allUsers.length ? Math.round(allMatches.length / allUsers.length * 10) / 10 : 0,
+        totalUsers:        totals.total_users,
+        activeToday:       totals.active_today,
+        matchesTotal:      totals.matches_total,
+        matchesToday:      totals.matches_today,
+        proUsers:          totals.pro_users,
+        eliteUsers:        totals.elite_users,
+        mrrUsd:            totals.pro_users * 3.49 + totals.elite_users * 9.49,
+        avgMatchesPerUser: totals.total_users ? Math.round(totals.matches_total / totals.total_users * 10) / 10 : 0,
       })
       runHealthChecks()
     } catch (e) {
@@ -111,13 +110,13 @@ export default function AdminPage() {
   const runHealthChecks = async () => {
     const results: SystemCheck[] = []
 
-    // Supabase
+    // MySQL, probed through the API rather than from the browser
     const t0 = Date.now()
     try {
-      await supabase.from('players').select('id').limit(1)
-      results.push({ name: 'Supabase DB', status: 'ok', latency: Date.now() - t0, detail: 'Connected & responding' })
+      await searchPlayers({ limit: 1 })
+      results.push({ name: 'MySQL', status: 'ok', latency: Date.now() - t0, detail: 'Connected & responding' })
     } catch {
-      results.push({ name: 'Supabase DB', status: 'error', latency: Date.now() - t0, detail: 'Connection failed' })
+      results.push({ name: 'MySQL', status: 'error', latency: Date.now() - t0, detail: 'Connection failed' })
     }
 
     // Sim engine
@@ -160,7 +159,7 @@ export default function AdminPage() {
 
   const toggleFlag = (key: string) => {
     setFlags(f => f.map(x => x.key === key ? { ...x, enabled: !x.enabled } : x))
-    // In production: persist to Supabase feature_flags table
+    // In production: persist to the feature_flags table
   }
 
   const statusDot = (s: SystemCheck['status']) =>
@@ -249,7 +248,7 @@ export default function AdminPage() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="text-xs font-medium text-[var(--cream)]">Player data sync</div>
-                <div className="text-[10px] text-[var(--muted)]">CricAPI → Supabase players table</div>
+                <div className="text-[10px] text-[var(--muted)]">CricAPI → MySQL players table</div>
               </div>
               <button onClick={triggerSync} disabled={syncing}
                 className="text-xs px-3 py-1.5 bg-[var(--pitch)] border border-[var(--pitch-light)] text-green-200 rounded-lg disabled:opacity-50">

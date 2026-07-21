@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, getUserMatches } from '@/lib/supabase'
+import { auth, getUserMatches } from '@/lib/api'
 import { useSetupStore } from '@/lib/store'
 
 interface Match {
@@ -35,21 +35,17 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    auth.getUserAndProfile().then(({ user, profile }) => {
       if (!user) { router.push('/auth/login'); return }
       setUser(user)
-      loadData(user.id)
+      setProfile(profile)
+      loadMatches()
     })
   }, [])
 
-  const loadData = async (uid: string) => {
+  const loadMatches = async () => {
     try {
-      const [profileRes, matchRes] = await Promise.all([
-        supabase.from('user_profiles').select('*').eq('id', uid).single(),
-        getUserMatches(uid),
-      ])
-      setProfile(profileRes.data)
-      setMatches(matchRes)
+      setMatches(await getUserMatches())
     } catch (e) {
       console.error(e)
     } finally {
@@ -58,7 +54,7 @@ export default function DashboardPage() {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await auth.signOut()
     router.push('/')
   }
 

@@ -3,12 +3,12 @@
  * QuickCric Analytics
  * ─────────────────────
  * Lightweight privacy-first event tracker.
- * Stores to Supabase analytics_events table.
+ * Stores to the analytics_events table via /api/analytics.
  * No third-party trackers. GDPR compliant by default.
  */
 
 import { useCallback, useEffect, useRef } from 'react'
-import { supabase } from './supabase'
+import { trackEvents, getAnalyticsSummaryData, getAdminAnalyticsData } from './api'
 
 type EventName =
   | 'page_view'
@@ -74,7 +74,7 @@ async function flushEvents() {
   if (!eventQueue.length) return
   const batch = eventQueue.splice(0, 20)   // max 20 per flush
   try {
-    await supabase.from('analytics_events').insert(batch)
+    await trackEvents(batch)
   } catch {}
 }
 
@@ -86,10 +86,12 @@ export function track(
 ) {
   if (typeof window === 'undefined') return
 
+  // user_id and created_at are no longer sent: the API stamps both from
+  // the session and the server clock, so events cannot be backdated or
+  // attributed to another account.
   const payload = {
     event,
     session_id:  getSessionId(),
-    user_id:     opts.userId ?? null,
     properties:  {
       ...properties,
       url:         window.location.pathname,
@@ -98,7 +100,6 @@ export function track(
       device:      window.innerWidth < 768 ? 'mobile' : window.innerWidth < 1024 ? 'tablet' : 'desktop',
     },
     page:        window.location.pathname,
-    created_at:  new Date().toISOString(),
   }
 
   queueEvent(payload)
@@ -127,38 +128,26 @@ export function useAnalytics(userId?: string | null) {
 
 // ── SERVER-SIDE AGGREGATE QUERIES ─────────────────────────────────
 
-export async function getAnalyticsSummary(userId: string) {
-  const [eventsRes, matchRes] = await Promise.all([
-    supabase
-      .from('analytics_events')
-      .select('event, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(500),
-    supabase
-      .from('matches')
-      .select('format, pitch_type, winner, innings1_score, created_at')
-      .eq('user_id', userId)
-      .eq('status', 'complete')
-      .limit(100),
-  ])
+// The userId argument is ignored — the endpoint scopes to the session
+// user. It is kept so existing call sites compile unchanged.
+export async function getAnalyticsSummary(_userId?: string) {
+  const { events, matches } = await getAnalyticsSummaryData()
 
-  const events  = eventsRes.data  ?? []
-  const matches = matchRes.data   ?? []
+  const tally = (rows: any[], key: string): Record<string, number> => {
+    const out: Record<string, number> = {}
+    for (const r of rows) if (r[key]) out[r[key]] = (out[r[key]] ?? 0) + 1
+    return out
+  }
 
-  const byEvent = events.reduce((acc, e) => {
-    acc[e.event] = (acc[e.event] ?? 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+  const byEvent  = tally(events, 'event')
+  const byFormat = tally(matches, 'format')
 
   return {
     totalEvents:     events.length,
     matchesPlayed:   matches.length,
     matchesWon:      matches.filter(m => m.winner === 'A').length,
     avgScore:        matches.length ? Math.round(matches.reduce((s, m) => s + (m.innings1_score ?? 0), 0) / matches.length) : 0,
-    favoriteFormat:  Object.entries(
-      matches.reduce((acc, m) => ({ ...acc, [m.format]: (acc[m.format] ?? 0) + 1 }), {} as Record<string, number>)
-    ).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'T20',
+    favoriteFormat:  Object.entries(byFormat).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'T20',
     sixesHit:        byEvent['six_hit'] ?? 0,
     wicketsFell:     byEvent['wicket_fell'] ?? 0,
     autoModeUses:    byEvent['auto_mode_on'] ?? 0,
@@ -168,48 +157,19 @@ export async function getAnalyticsSummary(userId: string) {
 
 // ── ADMIN ANALYTICS QUERIES ───────────────────────────────────────
 
+// The DAU rollup and event counts are now grouped in SQL rather than by
+// pulling every raw event into the browser, and the endpoint is behind an
+// admin check — previously any signed-in user could read this.
 export async function getAdminAnalytics(days = 30) {
-  const since = new Date(Date.now() - days * 86400000).toISOString()
+  const { dauByDay, eventCounts, paidPlans } = await getAdminAnalyticsData(days)
 
-  const [dau, events, revenue] = await Promise.all([
-    supabase
-      .from('analytics_events')
-      .select('user_id, created_at')
-      .gte('created_at', since)
-      .eq('event', 'page_view'),
-    supabase
-      .from('analytics_events')
-      .select('event')
-      .gte('created_at', since),
-    supabase
-      .from('user_profiles')
-      .select('plan')
-      .in('plan', ['pro', 'elite']),
-  ])
+  const mrr = paidPlans.reduce(
+    (s, r) => s + (r.plan === 'pro' ? 3.49 : r.plan === 'elite' ? 9.49 : 0) * r.count, 0)
 
-  const dauData   = dau.data    ?? []
-  const eventData = events.data ?? []
-  const revData   = revenue.data ?? []
-
-  // Daily active users
-  const byDay: Record<string, Set<string>> = {}
-  dauData.forEach(e => {
-    const day = e.created_at.slice(0, 10)
-    if (!byDay[day]) byDay[day] = new Set()
-    if (e.user_id) byDay[day].add(e.user_id)
-  })
-  const dauByDay = Object.entries(byDay)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, users]) => ({ date, count: users.size }))
-
-  // Event counts
-  const eventCounts = eventData.reduce((acc, e) => {
-    acc[e.event] = (acc[e.event] ?? 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  // MRR
-  const mrr = revData.reduce((s, u) => s + (u.plan === 'pro' ? 3.49 : u.plan === 'elite' ? 9.49 : 0), 0)
-
-  return { dauByDay, eventCounts, mrr: Math.round(mrr * 100) / 100, totalPaidUsers: revData.length }
+  return {
+    dauByDay,
+    eventCounts,
+    mrr: Math.round(mrr * 100) / 100,
+    totalPaidUsers: paidPlans.reduce((s, r) => s + r.count, 0),
+  }
 }

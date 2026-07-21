@@ -2,7 +2,12 @@
 /**
  * QuickCric Notifications
  * ──────────────────────────
- * Real-time push via Supabase Realtime (Postgres changes).
+ * Polls /api/notifications every 30s. This replaced Supabase Realtime:
+ * self-hosted MySQL has no change-feed to subscribe to, and for a badge
+ * that updates on achievements and match invites, a poll on an indexed
+ * (user_id, created_at) lookup is cheaper than running a socket layer.
+ * The `since` cursor means each poll returns only genuinely new rows.
+ *
  * Shows in-app toast + badge. Types:
  *   achievement   — badge earned
  *   challenge     — friend challenged you to a match
@@ -13,7 +18,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/lib/api'
 import { createPortal } from 'react-dom'
 
 interface Notification {
@@ -57,44 +62,47 @@ export function useNotifications(userId: string | null) {
   const [toasts,        setToasts]        = useState<Toast[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Load existing notifications
+  // Newest created_at we have seen, used as the poll cursor. A ref, not
+  // state, so advancing it does not re-trigger the polling effect.
+  const cursor = useRef<string | null>(null)
+
+  // Initial load
   useEffect(() => {
     if (!userId) return
-    supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(30)
-      .then(({ data }) => {
-        if (data) {
-          setNotifications(data)
-          setUnread(data.filter(n => !n.read).length)
-        }
-      })
+    let cancelled = false
+
+    getNotifications().then(rows => {
+      if (cancelled || !rows.length) return
+      setNotifications(rows)
+      setUnread(rows.filter(n => !n.read).length)
+      cursor.current = rows[0].created_at
+    }).catch(() => {})
+
+    return () => { cancelled = true }
   }, [userId])
 
-  // Realtime subscription
+  // Poll for new arrivals
   useEffect(() => {
     if (!userId) return
 
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on('postgres_changes', {
-        event:  'INSERT',
-        schema: 'public',
-        table:  'notifications',
-        filter: `user_id=eq.${userId}`,
-      }, (payload) => {
-        const notif = payload.new as Notification
-        setNotifications(prev => [notif, ...prev])
-        setUnread(u => u + 1)
-        showToast(notif)
-        playSound(notif.type)
-      })
-      .subscribe()
+    const tick = async () => {
+      // Nothing to show while the tab is hidden, and polling a background
+      // tab is pure waste.
+      if (document.hidden) return
+      try {
+        const fresh = await getNotifications(cursor.current ?? undefined)
+        if (!fresh.length) return
 
-    return () => { supabase.removeChannel(channel) }
+        cursor.current = fresh[0].created_at
+        setNotifications(prev => [...fresh, ...prev])
+        setUnread(u => u + fresh.length)
+        // Announce newest last so the most recent toast ends up on top.
+        fresh.slice().reverse().forEach(n => { showToast(n); playSound(n.type) })
+      } catch {}
+    }
+
+    const timer = setInterval(tick, 30_000)
+    return () => clearInterval(timer)
   }, [userId])
 
   const showToast = useCallback((notif: Notification) => {
@@ -120,14 +128,14 @@ export function useNotifications(userId: string | null) {
   }, [])
 
   const markRead = useCallback(async (id: string) => {
-    await supabase.from('notifications').update({ read: true }).eq('id', id)
+    await markNotificationRead(id)
     setNotifications(n => n.map(x => x.id === id ? { ...x, read: true } : x))
     setUnread(u => Math.max(0, u - 1))
   }, [])
 
   const markAllRead = useCallback(async () => {
     if (!userId) return
-    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+    await markAllNotificationsRead()
     setNotifications(n => n.map(x => ({ ...x, read: true })))
     setUnread(0)
   }, [userId])

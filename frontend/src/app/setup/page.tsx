@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSetupStore } from '@/lib/store'
 import { Stadium } from '@/types'
-import { getStadiums } from '@/lib/supabase'
+import { getStadiums } from '@/lib/api'
 import { WizardHeader, WizardFooter } from '@/components/setup/WizardShell'
 import { useState } from 'react'
 

@@ -1,8 +1,9 @@
 // src/app/api/stripe/checkout/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/middleware'
-import { cookies } from 'next/headers'
+import { currentUser } from '@/lib/auth-server'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,8 +13,7 @@ export async function POST(req: NextRequest) {
     if (!stripeKey) return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
     const stripe = new Stripe(stripeKey, { apiVersion: '2024-04-10' })
 
-    const supabase = createClient(cookies())
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await currentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { priceId } = await req.json()

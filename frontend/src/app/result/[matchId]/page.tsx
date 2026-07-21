@@ -67,7 +67,7 @@ export default function ResultPage() {
   const potm       = isLive ? livePotm : (saved?.potm ?? null)
   const hasMatch   = isLive || !!saved
 
-  // Snapshot this match into history (Supabase for signed-in users,
+  // Snapshot this match into history (MySQL for signed-in users,
   // localStorage fallback) so it shows up under "Your previous matches".
   // Save exactly once: "Build a new match" resets the setup store while
   // this page is still mounted, which used to re-fire this effect with the

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { auth } from '@/lib/api'
 import { NotificationBell } from '@/components/notifications/NotificationSystem'
 
 interface NavProps {
@@ -33,20 +33,17 @@ export function GlobalNav({ transparent = false }: NavProps) {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // One request for both — /api/auth/me returns the user and profile
+    // together, where Supabase needed a getUser() then a profile select.
+    auth.getUserAndProfile().then(({ user, profile }) => {
       setUser(user)
-      if (user) {
-        supabase.from('user_profiles')
-          .select('display_name, plan, referral_credits')
-          .eq('id', user.id).single()
-          .then(({ data }) => setProfile(data))
-      }
+      setProfile(profile)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null)
+    return auth.onAuthStateChange(u => {
+      setUser(u)
+      if (!u) setProfile(null)
     })
-    return () => sub.subscription.unsubscribe()
   }, [])
 
   const isActive = (href: string) => pathname?.startsWith(href)

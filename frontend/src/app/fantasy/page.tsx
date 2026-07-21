@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Player } from '@/types'
-import { searchPlayers } from '@/lib/supabase'
+import { searchPlayers } from '@/lib/api'
 
 // ── POINTS SYSTEM ─────────────────────────────────────────────────
 const FANTASY_POINTS = {

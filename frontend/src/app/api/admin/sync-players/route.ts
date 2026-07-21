@@ -1,20 +1,13 @@
 // src/app/api/admin/sync-players/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/middleware'
-import { cookies } from 'next/headers'
+import { currentUser, isAdmin } from '@/lib/auth-server'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  // Verify admin
-  const supabase = createClient(cookies())
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await currentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: adminCheck } = await supabase
-    .from('admin_users').select('role').eq('user_id', user.id).single()
-
-  if (!adminCheck && !user.email?.endsWith('@cricketverse.app')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  if (!(await isAdmin(user))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Trigger sync on sim engine
   try {

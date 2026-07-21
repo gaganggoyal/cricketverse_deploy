@@ -12,11 +12,11 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: 'Third-party services',
-    body: `We use Supabase for database and authentication (hosted in the EU), Stripe for payment processing (PCI-compliant), Anthropic Claude API for AI commentary (your match data is sent as context but not stored by Anthropic for training), and CricAPI for real player statistics.`
+    body: `Accounts and application data live in our own database on our own server — we do not use a third-party authentication or database provider. We use Stripe for payment processing (PCI-compliant), Anthropic Claude API for AI commentary (your match data is sent as context but not stored by Anthropic for training), and CricAPI for real player statistics.`
   },
   {
     title: 'Cookies',
-    body: `We use only essential cookies required for authentication (Supabase session tokens). We do not use advertising or tracking cookies. You can clear cookies at any time from your browser settings.`
+    body: `We use only essential cookies required for authentication (a session cookie issued by this site). We do not use advertising or tracking cookies. You can clear cookies at any time from your browser settings.`
   },
   {
     title: 'Data retention',

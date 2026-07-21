@@ -28,9 +28,25 @@ ufw --force enable
 
 # Docker + compose plugin
 curl -fsSL https://get.docker.com | sh
+
+# MySQL 8 — runs on the host, not in the compose stack
+apt install -y mysql-server
 ```
 
-## 2. Get the code and configure
+Leave MySQL's `bind-address` at `127.0.0.1` and do **not** open 3306. The
+containers reach it over the host's unix socket, which
+`docker-compose.prod.yml` bind-mounts into them.
+
+## 2. Create the database
+
+```bash
+mysql -e "CREATE DATABASE quickcric CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          CREATE USER 'quickcric'@'localhost' IDENTIFIED BY 'a-strong-password';
+          GRANT ALL PRIVILEGES ON quickcric.* TO 'quickcric'@'localhost';
+          FLUSH PRIVILEGES;"
+```
+
+## 3. Get the code and configure
 
 ```bash
 git clone https://github.com/gaganggoyal/cricketverse_deploy.git
@@ -39,9 +55,10 @@ cp .env.example .env
 nano .env
 ```
 
-Fill in the real Supabase/Stripe/Anthropic keys, and set the **production
-URLs** — these three lines are what make the app talk to itself through
-the domain instead of localhost:
+Set `DB_PASSWORD` to the password you just chose, fill in the
+Stripe/Anthropic keys, and set the **production URLs** — these three lines
+are what make the app talk to itself through the domain instead of
+localhost:
 
 ```env
 NEXT_PUBLIC_APP_URL=https://quickcric.online
@@ -50,14 +67,12 @@ NEXT_PUBLIC_MP_URL=wss://quickcric.online/mp
 CORS_ORIGINS=https://quickcric.online,https://www.quickcric.online
 ```
 
-## 3. Supabase dashboard (once)
+Then apply the schema and seed data:
 
-Authentication → URL Configuration:
-- **Site URL**: `https://quickcric.online`
-- **Redirect URLs**: add `https://quickcric.online/auth/callback`
-
-(If Google sign-in is enabled, also add the domain to the OAuth client's
-authorized origins in Google Cloud Console.)
+```bash
+mysql -u quickcric -p quickcric < database/mysql/001_schema.sql
+mysql -u quickcric -p quickcric < database/mysql/002_seed.sql
+```
 
 ## 4. Launch
 
